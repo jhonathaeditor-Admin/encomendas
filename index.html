@@ -69,16 +69,43 @@
 </head>
 <body>
 
+<!-- TELA DE LOGIN -->
+<div id="tela-login" style="display:none;position:fixed;inset:0;background:var(--azul);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div class="card" style="width:100%;max-width:360px;margin:0">
+    <div style="text-align:center;font-size:34px">📦</div>
+    <h2 style="text-align:center;margin:6px 0 2px">Central de Encomendas</h2>
+    <div class="meta" style="text-align:center;margin-bottom:14px">Spazio Montero — Portaria</div>
+    <label>E-mail</label>
+    <input id="login-email" type="email" inputmode="email" autocomplete="username" placeholder="seu-email@exemplo.com">
+    <label>Senha</label>
+    <input id="login-senha" type="password" autocomplete="current-password" placeholder="sua senha" onkeydown="if(event.key==='Enter')fazerLogin()">
+    <button class="acao" onclick="fazerLogin()">Entrar</button>
+    <div id="login-erro" class="meta" style="color:var(--vermelho);margin-top:8px;text-align:center"></div>
+  </div>
+</div>
+
+<!-- APP (só aparece depois do login) -->
+<div id="app" style="display:none">
+
 <header>
-  <h1>📦 Central de Encomendas</h1>
-  <small>Spazio Montero — Portaria</small>
-  <div id="status-conn">conectando…</div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+    <div>
+      <h1>📦 Central de Encomendas</h1>
+      <small>Spazio Montero — Portaria</small>
+      <div id="status-conn">conectando…</div>
+    </div>
+    <div style="text-align:right">
+      <div id="usuario-info" style="font-size:12px;opacity:.9"></div>
+      <button onclick="fazerLogout()" style="margin-top:4px;background:rgba(255,255,255,.2);color:#fff;border:0;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer">Sair</button>
+    </div>
+  </div>
 </header>
 
 <nav>
   <button data-aba="receber" class="ativo" onclick="trocarAba('receber')">Receber</button>
   <button data-aba="encomendas" onclick="trocarAba('encomendas')">Encomendas</button>
   <button data-aba="moradores" onclick="trocarAba('moradores')">Moradores</button>
+  <button data-aba="relatorios" onclick="trocarAba('relatorios')">Relatórios</button>
 </nav>
 
 <main>
@@ -144,7 +171,7 @@
 
   <!-- ABA MORADORES -->
   <section id="aba-moradores" style="display:none">
-    <div class="card">
+    <div class="card gestao-only" id="card-cadastrar-morador">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <strong>Cadastrar morador</strong>
         <button class="linkbtn" onclick="toggleFormMorador()">mostrar/ocultar</button>
@@ -162,7 +189,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card gestao-only" id="card-importar">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <strong>📄 Importar planilha</strong>
         <button class="linkbtn" onclick="toggleImport()">mostrar/ocultar</button>
@@ -188,6 +215,34 @@
     <input id="m-busca" placeholder="🔎 Buscar por nome ou apartamento" oninput="renderMoradores()" style="margin-bottom:12px">
     <div id="lista-moradores"><div class="vazio">Carregando…</div></div>
   </section>
+
+  <!-- ABA RELATÓRIOS -->
+  <section id="aba-relatorios" style="display:none">
+    <div class="card">
+      <strong>📊 Gerar relatório</strong>
+      <div class="row2">
+        <div><label>Bloco</label><select id="rel-bloco"><option value="">Todos</option></select></div>
+        <div><label>Situação</label>
+          <select id="rel-status">
+            <option value="todas">Todas</option>
+            <option value="pendentes">Pendentes</option>
+            <option value="retiradas">Retiradas</option>
+          </select>
+        </div>
+      </div>
+      <label>Filtrar por morador / apartamento (opcional)</label>
+      <input id="rel-morador" placeholder="Nome ou número do apartamento">
+      <label>Período</label>
+      <select id="rel-periodo">
+        <option value="0">Tudo</option>
+        <option value="7">Últimos 7 dias</option>
+        <option value="30">Últimos 30 dias</option>
+        <option value="90">Últimos 90 dias</option>
+      </select>
+      <button class="acao" onclick="gerarRelatorio()">Gerar relatório</button>
+    </div>
+    <div id="rel-resultado"></div>
+  </section>
 </main>
 
 <input type="file" id="baixa-manual-foto" accept="image/*" capture="environment" style="display:none" onchange="baixaManualComFoto(event)">
@@ -203,6 +258,7 @@
 </div>
 <canvas id="scanner-canvas" style="display:none"></canvas>
 <div id="toast" class="toast"></div>
+</div><!-- fim #app -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -218,6 +274,43 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let MORADORES = [];
 let ENCOMENDAS = [];
 let filtroAtual = "pendentes";
+let PAPEL = 'portaria';   // 'portaria' ou 'gestao'
+let USUARIO = null;
+
+// ---------- LOGIN / PERFIL ----------
+async function fazerLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-senha').value;
+  const err = document.getElementById('login-erro');
+  err.textContent = '';
+  if(!email || !senha){ err.textContent = 'Preencha e-mail e senha.'; return; }
+  const {data, error} = await db.auth.signInWithPassword({ email, password: senha });
+  if(error){ err.textContent = 'E-mail ou senha inválidos.'; return; }
+  await entrarNoApp(data.user);
+}
+async function fazerLogout(){
+  await db.auth.signOut();
+  location.reload();
+}
+async function entrarNoApp(user){
+  USUARIO = user;
+  // busca o papel do usuário
+  try{
+    const {data} = await db.from('perfis').select('papel,nome').eq('id', user.id).single();
+    PAPEL = (data && data.papel) || 'portaria';
+  }catch(e){ PAPEL = 'portaria'; }
+  document.getElementById('tela-login').style.display = 'none';
+  document.getElementById('app').style.display = '';
+  document.getElementById('usuario-info').textContent =
+    (PAPEL==='gestao'?'👤 Gestão':'👤 Portaria') + ' · ' + (user.email||'');
+  configurarPorPerfil();
+  await iniciarDados();
+}
+function configurarPorPerfil(){
+  const soGestao = PAPEL === 'gestao';
+  // esconde cadastrar morador e importar planilha da portaria
+  document.querySelectorAll('.gestao-only').forEach(el=>{ el.style.display = soGestao ? '' : 'none'; });
+}
 
 // ---------- utilidades ----------
 function toast(msg, cor){
@@ -243,8 +336,10 @@ function trocarAba(aba){
   document.getElementById('aba-receber').style.display   = aba==='receber' ? '' : 'none';
   document.getElementById('aba-encomendas').style.display= aba==='encomendas' ? '' : 'none';
   document.getElementById('aba-moradores').style.display = aba==='moradores' ? '' : 'none';
+  document.getElementById('aba-relatorios').style.display= aba==='relatorios' ? '' : 'none';
   if(aba==='encomendas') carregarEncomendas();
   if(aba==='moradores') renderMoradores();
+  if(aba==='relatorios') prepararRelatorio();
 }
 
 // ---------- carregar dados ----------
@@ -399,13 +494,21 @@ function lerQR(file){
 // ---------- LEITURA DA ETIQUETA (foto + OCR grátis) ----------
 let FOTO_SELECIONADA = null; // arquivo da foto pra subir ao salvar
 
-// envia um arquivo pro Storage e devolve o link público
+// envia um arquivo pro Storage (reduzido, p/ durar mais) e devolve o CAMINHO
 async function uploadArquivo(file, prefixo){
-  const ext = ((file.name||'foto.jpg').split('.').pop()||'jpg').toLowerCase();
-  const nome = prefixo+'/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ext;
-  const {error} = await db.storage.from('comprovantes').upload(nome, file, {upsert:false, contentType:file.type||'image/jpeg'});
+  const menor = await reduzirImagem(file, 1000);  // reduz antes de guardar
+  const nome = prefixo+'/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.jpg';
+  const {error} = await db.storage.from('comprovantes').upload(nome, menor, {upsert:false, contentType:'image/jpeg'});
   if(error) throw error;
-  return db.storage.from('comprovantes').getPublicUrl(nome).data.publicUrl;
+  return nome; // bucket é privado: guardamos o caminho, não uma URL pública
+}
+// abre uma foto do bucket privado (gera link temporário assinado)
+async function verFoto(path){
+  if(!path) return;
+  if(/^https?:\/\//.test(path)){ window.open(path, '_blank'); return; } // compat: registros antigos
+  const {data, error} = await db.storage.from('comprovantes').createSignedUrl(path, 3600);
+  if(error || !data){ toast('Não consegui abrir a foto', '#d23c3c'); return; }
+  window.open(data.signedUrl, '_blank');
 }
 
 // tenta achar transportadora e código de rastreio no texto lido
@@ -783,8 +886,8 @@ function renderEncomendas(){
         </div>
         <div style="text-align:right">
           <div class="cod">${e.codigo_retirada}</div>
-          ${e.foto_url?`<a href="${escapeH(e.foto_url)}" target="_blank"><img src="${escapeH(e.foto_url)}" title="Foto no recebimento" style="width:56px;height:56px;object-fit:cover;border-radius:6px;margin-top:8px;border:1px solid var(--borda)"></a>`:''}
-          ${e.foto_retirada_url?`<a href="${escapeH(e.foto_retirada_url)}" target="_blank"><img src="${escapeH(e.foto_retirada_url)}" title="Comprovante de retirada" style="width:56px;height:56px;object-fit:cover;border-radius:6px;margin-top:8px;border:2px solid var(--verde)"></a>`:''}
+          ${e.foto_url?`<button class="linkbtn" style="display:block;margin-top:8px" onclick="verFoto('${escapeH(e.foto_url)}')">📷 Ver recebimento</button>`:''}
+          ${e.foto_retirada_url?`<button class="linkbtn" style="display:block;margin-top:6px;color:var(--verde)" onclick="verFoto('${escapeH(e.foto_retirada_url)}')">📷 Ver comprovante</button>`:''}
         </div>
       </div>
       <button class="acao ${e.impresso?'sec':''}" style="margin-top:12px" onclick="imprimirEncomenda('${e.id}')">${e.impresso?'🔁 Reimprimir cupom':'🖨️ Imprimir cupom'}</button>
@@ -794,9 +897,9 @@ function renderEncomendas(){
         </button>
         <button class="acao verde" style="margin-top:8px" onclick="darBaixa('${e.id}')">📷 Dar baixa (foto do cupom)</button>`}
       ${retirada?`<div style="text-align:center;margin-top:10px"><button class="linkbtn" style="color:#8a5a00" onclick="reverterBaixa('${e.id}')">↩️ Desfazer baixa (foi engano)</button></div>`:''}
-      <div style="text-align:center;margin-top:10px">
+      ${PAPEL==='gestao'?`<div style="text-align:center;margin-top:10px">
         <button class="linkbtn" style="color:var(--vermelho)" onclick="excluirEncomenda('${e.id}')">🗑️ Excluir esta encomenda</button>
-      </div>
+      </div>`:''}
     </div>`;
   }).join('');
 }
@@ -1297,8 +1400,68 @@ async function aplicarImport(){
   }catch(err){ console.error(err); toast('Erro ao salvar: '+(err.message||err), '#d23c3c'); }
 }
 
-// ---------- inicialização ----------
-(async function init(){
+// ---------- RELATÓRIOS ----------
+let REL_LINHAS = [];
+function prepararRelatorio(){
+  const sel = document.getElementById('rel-bloco');
+  const blocos = [...new Set(MORADORES.filter(m=>m.bloco).map(m=>m.bloco))]
+    .sort((a,b)=>(''+a).localeCompare(''+b,undefined,{numeric:true}));
+  sel.innerHTML = '<option value="">Todos</option>' + blocos.map(b=>`<option value="${escapeH(b)}">${escapeH(b)}</option>`).join('');
+}
+async function gerarRelatorio(){
+  const bloco = document.getElementById('rel-bloco').value;
+  const status = document.getElementById('rel-status').value;
+  const qMor = normalizar(document.getElementById('rel-morador').value);
+  const dias = parseInt(document.getElementById('rel-periodo').value)||0;
+  const box = document.getElementById('rel-resultado');
+  box.innerHTML = '<div class="meta" style="padding:10px">Gerando…</div>';
+  if(!ENCOMENDAS.length) await carregarEncomendas();
+  const limite = dias>0 ? Date.now()-dias*86400000 : 0;
+  let linhas = ENCOMENDAS.map(e=>({e, m: MORADORES.find(x=>x.id===e.morador_id)||{}}));
+  linhas = linhas.filter(({e,m})=>{
+    if(bloco && normalizar(m.bloco)!==normalizar(bloco)) return false;
+    if(status==='pendentes' && e.status==='retirada') return false;
+    if(status==='retiradas' && e.status!=='retirada') return false;
+    if(qMor && !(normalizar(m.nome).includes(qMor)||normalizar(m.apartamento).includes(qMor))) return false;
+    if(limite && new Date(e.recebida_em).getTime() < limite) return false;
+    return true;
+  });
+  REL_LINHAS = linhas;
+  const total = linhas.length;
+  const retiradas = linhas.filter(x=>x.e.status==='retirada').length;
+  const pendentes = total - retiradas;
+  box.innerHTML = `
+    <div class="card">
+      <div style="display:flex;gap:8px;text-align:center">
+        <div style="flex:1"><div style="font-size:24px;font-weight:800">${total}</div><div class="meta">total</div></div>
+        <div style="flex:1"><div style="font-size:24px;font-weight:800;color:var(--vermelho)">${pendentes}</div><div class="meta">pendentes</div></div>
+        <div style="flex:1"><div style="font-size:24px;font-weight:800;color:var(--verde)">${retiradas}</div><div class="meta">retiradas</div></div>
+      </div>
+      <button class="acao sec" style="margin-top:12px" onclick="baixarRelatorioCSV()">⬇️ Baixar planilha (CSV)</button>
+    </div>
+    ${linhas.length ? linhas.map(({e,m})=>`
+      <div class="lista-item">
+        <div style="font-weight:700">Apto ${escapeH(m.apartamento||'?')}${m.bloco?' Bl '+escapeH(m.bloco):''} — ${escapeH(m.nome||'(removido)')}</div>
+        <div class="meta">Código ${escapeH(e.codigo_retirada)} · ${e.transportadora?escapeH(e.transportadora)+' · ':''}${escapeH(e.status)}</div>
+        <div class="meta">Recebido ${fmtData(e.recebida_em)}${e.status==='retirada'?' · Retirado '+fmtData(e.retirada_em)+' por '+escapeH(e.retirada_por||'?'):''}</div>
+      </div>`).join('') : '<div class="vazio">Nenhuma encomenda com esses filtros.</div>'}
+  `;
+}
+function baixarRelatorioCSV(){
+  const linhas = [['Apartamento','Bloco','Morador','Codigo','Transportadora','Rastreio','Status','Recebido','Retirado em','Retirado por']];
+  REL_LINHAS.forEach(({e,m})=>{
+    linhas.push([m.apartamento||'', m.bloco||'', m.nome||'', e.codigo_retirada||'', e.transportadora||'',
+      e.codigo_rastreio||'', e.status||'', fmtData(e.recebida_em), e.retirada_em?fmtData(e.retirada_em):'', e.retirada_por||'']);
+  });
+  const csv = linhas.map(r=>r.map(c=>`"${(''+c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='relatorio_encomendas.csv'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+}
+
+// carrega os dados depois de logado
+async function iniciarDados(){
   const st = document.getElementById('status-conn');
   try{
     const {error} = await db.from('moradores').select('id').limit(1);
@@ -1309,10 +1472,20 @@ async function aplicarImport(){
     st.textContent = '🔴 Sem conexão com o banco';
     st.style.color = '#ffd4d4';
     console.error(err);
-    toast('Não consegui conectar ao banco. Verifique a internet.', '#d23c3c');
   }
   montarChipsTransp();
   await carregarMoradores();
+}
+
+// ---------- inicialização: checa login primeiro ----------
+(async function init(){
+  const {data} = await db.auth.getSession();
+  if(data && data.session && data.session.user){
+    await entrarNoApp(data.session.user);
+  } else {
+    document.getElementById('tela-login').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
 })();
 </script>
 </body>
