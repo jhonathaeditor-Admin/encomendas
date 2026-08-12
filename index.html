@@ -431,16 +431,20 @@ function blobParaBase64(blob){
     r.readAsDataURL(blob);
   });
 }
-// pede pro Gemini (via Edge Function) ler o rótulo; devolve os dados ou null
+// pede pro Gemini (via Edge Function) ler o rótulo; devolve {dados} ou {erro}
 async function lerEtiquetaIA(file){
   try{
     const menor = await reduzirImagem(file, 1200);
     const b64 = await blobParaBase64(menor);
     const {data, error} = await db.functions.invoke('ler-etiqueta', { body:{ imagemBase64:b64, mime:'image/jpeg' } });
-    if(error) throw error;
-    if(data && data.ok && data.dados) return data.dados;
-    return null;
-  }catch(err){ console.warn('IA indisponível, usando leitor grátis:', err?.message||err); return null; }
+    if(error){
+      let msg = error.message || 'falha ao chamar a função';
+      try{ const b = await error.context.json(); if(b && b.erro) msg = b.erro; }catch(e){}
+      return { erro: msg };
+    }
+    if(data && data.ok && data.dados) return { dados: data.dados };
+    return { erro: (data && data.erro) || 'a IA não retornou dados' };
+  }catch(err){ return { erro: String((err && err.message) || err) }; }
 }
 
 // devolve os moradores mais prováveis (ranqueados) — NÃO escolhe sozinho.
@@ -448,7 +452,7 @@ async function lerEtiquetaIA(file){
 function candidatosMorador(texto){
   const t = normalizar(texto);
   const ativos = MORADORES.filter(m=>m.ativo);
-  const res = [];
+  const comNome = [], soLocal = [];
   for(const m of ativos){
     const partes = normalizar(m.nome).split(/\s+/).filter(p=>p.length>=3);
     let nomeHits = 0;
@@ -456,14 +460,18 @@ function candidatosMorador(texto){
     const apto = normalizar(m.apartamento);
     const aptoHit = apto && new RegExp('(^|\\D)'+apto+'(\\D|$)').test(t);
     const blocoHit = m.bloco && (t.includes('bloco '+normalizar(m.bloco)) || t.includes('bl '+normalizar(m.bloco)));
-    // só entra se casar parte do NOME, ou apartamento E bloco juntos
-    if(nomeHits>=1 || (aptoHit && blocoHit)){
-      const nota = nomeHits*4 + (aptoHit?2:0) + (blocoHit?2:0);
-      res.push({ m, nota });
+    if(nomeHits>=1){
+      // casou pelo NOME — o apartamento/bloco só reforçam a ordem
+      comNome.push({ m, nota: nomeHits*10 + (aptoHit?3:0) + (blocoHit?2:0) });
+    } else if(aptoHit && blocoHit){
+      soLocal.push({ m, nota: 5 });
     }
   }
-  res.sort((a,b)=>b.nota-a.nota);
-  return res.slice(0, 6);
+  // O NOME manda: se alguém casou pelo nome, só mostramos esses.
+  // Só caímos no apartamento+bloco quando NENHUM nome bateu.
+  const base = comNome.length ? comNome : soLocal;
+  base.sort((a,b)=>b.nota-a.nota);
+  return base.slice(0, 6);
 }
 // destaca o candidato tocado
 function marcarEscolhaOCR(btn){
@@ -480,14 +488,16 @@ async function lerEtiqueta(ev){
   const st = document.getElementById('ocr-status');
   st.innerHTML = '<span class="meta">🔎 Lendo a etiqueta…</span>';
   try{
-    let texto = '', viaIA = false;
-    const dados = await lerEtiquetaIA(file);   // tenta a IA (Gemini) primeiro
-    if(dados){
+    let texto = '', viaIA = false, erroIA = '';
+    const ia = await lerEtiquetaIA(file);   // tenta a IA (Gemini) primeiro
+    if(ia.dados){
+      const dados = ia.dados;
       viaIA = true;
       if(dados.transportadora) definirTransportadora(dados.transportadora);
       if(dados.rastreio) document.getElementById('r-rastreio').value = dados.rastreio;
       texto = `${dados.nome||''} apto ${dados.apartamento||''} bloco ${dados.bloco||''}`;
     } else {
+      erroIA = ia.erro || '';
       texto = await lerTexto(file);            // reserva: leitor grátis
       const {transportadora, rastreio} = extrairDados(texto);
       if(transportadora) definirTransportadora(transportadora);
@@ -508,6 +518,7 @@ async function lerEtiqueta(ev){
     const rastAtual = document.getElementById('r-rastreio').value;
     st.innerHTML = `<div class="card" style="background:var(--cinza);padding:10px;margin:0">
       <div class="meta">${viaIA?'🤖 Lido por IA':'🔎 Lido pelo leitor grátis'}</div>
+      ${erroIA?`<div class="meta" style="color:var(--vermelho)">IA indisponível: ${escapeH(erroIA)}</div>`:''}
       <span class="meta">${transpAtual?'Transportadora: '+escapeH(transpAtual)+'<br>':''}${rastAtual?'Rastreio: '+escapeH(rastAtual):''}</span>
       ${blocoMorador}
       <div class="meta" style="margin-top:8px">⚠️ Confira sempre o apartamento e o bloco antes de registrar.</div>
