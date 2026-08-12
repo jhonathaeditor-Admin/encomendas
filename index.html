@@ -422,23 +422,53 @@ function extrairDados(texto){
   return {transportadora, rastreio};
 }
 
-// cruza o texto lido com a lista de moradores e devolve o melhor palpite
-function acharMorador(texto){
+// converte um arquivo/blob em base64 puro (sem o prefixo data:)
+function blobParaBase64(blob){
+  return new Promise((resolve, reject)=>{
+    const r = new FileReader();
+    r.onload = ()=>{ const s = ''+r.result; const i = s.indexOf(','); resolve(i>=0 ? s.slice(i+1) : s); };
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+// pede pro Gemini (via Edge Function) ler o rótulo; devolve os dados ou null
+async function lerEtiquetaIA(file){
+  try{
+    const menor = await reduzirImagem(file, 1200);
+    const b64 = await blobParaBase64(menor);
+    const {data, error} = await db.functions.invoke('ler-etiqueta', { body:{ imagemBase64:b64, mime:'image/jpeg' } });
+    if(error) throw error;
+    if(data && data.ok && data.dados) return data.dados;
+    return null;
+  }catch(err){ console.warn('IA indisponível, usando leitor grátis:', err?.message||err); return null; }
+}
+
+// devolve os moradores mais prováveis (ranqueados) — NÃO escolhe sozinho.
+// O nome é o sinal forte (o apartamento sozinho se repete entre blocos).
+function candidatosMorador(texto){
   const t = normalizar(texto);
   const ativos = MORADORES.filter(m=>m.ativo);
-  let melhor=null, melhorNota=0;
+  const res = [];
   for(const m of ativos){
-    let nota=0;
-    // pontua por partes do nome que aparecem no texto
     const partes = normalizar(m.nome).split(/\s+/).filter(p=>p.length>=3);
-    partes.forEach(p=>{ if(t.includes(p)) nota+=2; });
-    // pontua se o número do apartamento aparece
+    let nomeHits = 0;
+    partes.forEach(p=>{ if(t.includes(p)) nomeHits++; });
     const apto = normalizar(m.apartamento);
-    if(apto && new RegExp('\\b'+apto+'\\b').test(t)) nota+=3;
-    if(m.bloco && t.includes('bloco '+normalizar(m.bloco))) nota+=1;
-    if(nota>melhorNota){ melhorNota=nota; melhor=m; }
+    const aptoHit = apto && new RegExp('(^|\\D)'+apto+'(\\D|$)').test(t);
+    const blocoHit = m.bloco && (t.includes('bloco '+normalizar(m.bloco)) || t.includes('bl '+normalizar(m.bloco)));
+    // só entra se casar parte do NOME, ou apartamento E bloco juntos
+    if(nomeHits>=1 || (aptoHit && blocoHit)){
+      const nota = nomeHits*4 + (aptoHit?2:0) + (blocoHit?2:0);
+      res.push({ m, nota });
+    }
   }
-  return melhorNota>=3 ? melhor : null; // só sugere com confiança mínima
+  res.sort((a,b)=>b.nota-a.nota);
+  return res.slice(0, 6);
+}
+// destaca o candidato tocado
+function marcarEscolhaOCR(btn){
+  document.querySelectorAll('#ocr-status .cand').forEach(b=>{ b.classList.remove('chip-on'); b.style.background='#fff'; b.style.color='var(--texto)'; });
+  if(btn){ btn.style.background='var(--verde)'; btn.style.color='#fff'; }
 }
 
 async function lerEtiqueta(ev){
@@ -448,24 +478,39 @@ async function lerEtiqueta(ev){
   const prev = document.getElementById('ocr-preview');
   prev.src = URL.createObjectURL(file); prev.style.display='';
   const st = document.getElementById('ocr-status');
-  st.innerHTML = '<span class="meta">🔎 Lendo a etiqueta… (a primeira vez baixa o leitor, pode demorar um pouco)</span>';
+  st.innerHTML = '<span class="meta">🔎 Lendo a etiqueta…</span>';
   try{
-    const texto = await lerTexto(file);
-    const {transportadora, rastreio} = extrairDados(texto);
-    if(transportadora) definirTransportadora(transportadora);
-    if(rastreio) document.getElementById('r-rastreio').value = rastreio;
-    const m = acharMorador(texto);
-    let msgMorador;
-    if(m){
-      selecionarMoradorPicker(m.id);
-      msgMorador = `✅ Morador: <b>${escapeH(m.nome)}</b> (apto ${escapeH(m.apartamento)}${m.bloco?' Bl '+escapeH(m.bloco):''})`;
+    let texto = '', viaIA = false;
+    const dados = await lerEtiquetaIA(file);   // tenta a IA (Gemini) primeiro
+    if(dados){
+      viaIA = true;
+      if(dados.transportadora) definirTransportadora(dados.transportadora);
+      if(dados.rastreio) document.getElementById('r-rastreio').value = dados.rastreio;
+      texto = `${dados.nome||''} apto ${dados.apartamento||''} bloco ${dados.bloco||''}`;
     } else {
-      msgMorador = '⚠️ Não achei o morador — busque por apartamento, bloco ou nome no campo Morador.';
+      texto = await lerTexto(file);            // reserva: leitor grátis
+      const {transportadora, rastreio} = extrairDados(texto);
+      if(transportadora) definirTransportadora(transportadora);
+      if(rastreio) document.getElementById('r-rastreio').value = rastreio;
     }
+    const cands = candidatosMorador(texto);
+    let blocoMorador;
+    if(cands.length){
+      blocoMorador = `<div style="margin-top:8px;font-weight:700">Toque no morador certo:</div>` +
+        cands.map(c=>`<button type="button" class="acao sec cand" style="margin-top:6px;text-align:left"
+            onclick="selecionarMoradorPicker('${c.m.id}');marcarEscolhaOCR(this)">
+            Apto ${escapeH(c.m.apartamento)}${c.m.bloco?' Bl '+escapeH(c.m.bloco):''} — ${escapeH(c.m.nome)}
+          </button>`).join('');
+    } else {
+      blocoMorador = `<div class="meta" style="margin-top:8px;color:var(--vermelho);font-weight:700">⚠️ Não achei candidatos. Busque o morador manualmente no campo acima (apartamento, bloco ou nome).</div>`;
+    }
+    const transpAtual = document.getElementById('r-transportadora').value;
+    const rastAtual = document.getElementById('r-rastreio').value;
     st.innerHTML = `<div class="card" style="background:var(--cinza);padding:10px;margin:0">
-      ${msgMorador}<br>
-      <span class="meta">${transportadora?'Transportadora: '+escapeH(transportadora)+'<br>':''}${rastreio?'Rastreio: '+escapeH(rastreio):''}</span>
-      <div class="meta" style="margin-top:6px">Confira e ajuste os campos antes de registrar.</div>
+      <div class="meta">${viaIA?'🤖 Lido por IA':'🔎 Lido pelo leitor grátis'}</div>
+      <span class="meta">${transpAtual?'Transportadora: '+escapeH(transpAtual)+'<br>':''}${rastAtual?'Rastreio: '+escapeH(rastAtual):''}</span>
+      ${blocoMorador}
+      <div class="meta" style="margin-top:8px">⚠️ Confira sempre o apartamento e o bloco antes de registrar.</div>
     </div>`;
   }catch(err){
     console.error(err);
