@@ -662,13 +662,44 @@ function montarCupomImagem(e, m){
   const x2 = c2.getContext('2d');
   x2.fillStyle = '#fff'; x2.fillRect(0,0,W,alturaUsada);
   x2.drawImage(c, 0, 0);
-  return c2.toDataURL('image/png'); // "data:image/png;base64,...."
+  return c2; // canvas de 384 px de largura
 }
+
+// Converte o canvas em comando ESC/POS raster (GS v 0) com largura FIXA.
+// Assim o RawBT imprime 1:1 (384 pontos) e não estica/corta.
+function canvasParaEscpos(canvas){
+  const w = canvas.width, h = canvas.height;
+  const bytesLinha = Math.ceil(w/8);                 // 48 bytes = 384 pontos
+  const img = canvas.getContext('2d').getImageData(0,0,w,h).data;
+  const raster = new Uint8Array(bytesLinha*h);
+  for(let yy=0; yy<h; yy++){
+    for(let xx=0; xx<w; xx++){
+      const i = (yy*w+xx)*4;
+      const lum = 0.299*img[i] + 0.587*img[i+1] + 0.114*img[i+2];
+      if(img[i+3] > 128 && lum < 128){               // pixel escuro = ponto preto
+        raster[yy*bytesLinha + (xx>>3)] |= (0x80 >> (xx & 7));
+      }
+    }
+  }
+  const ESC='\x1B', GS='\x1D';
+  let s = ESC+'@';                                    // inicializa
+  s += GS+'v'+'0'+'\x00';                             // GS v 0, m=0
+  s += String.fromCharCode(bytesLinha & 0xFF) + String.fromCharCode((bytesLinha>>8) & 0xFF); // xL xH
+  s += String.fromCharCode(h & 0xFF) + String.fromCharCode((h>>8) & 0xFF);                    // yL yH
+  let dados = '';
+  for(let k=0; k<raster.length; k++) dados += String.fromCharCode(raster[k]);
+  s += dados;
+  s += '\n\n\n';                                      // avança o papel
+  return s;
+}
+
 function imprimirCupom(e, m){
   try{
-    const dataUrl = montarCupomImagem(e, m); // data:image/png;base64,...
+    const canvas = montarCupomImagem(e, m);
+    const escpos = canvasParaEscpos(canvas);
+    const b64 = btoa(escpos);
     const S = '#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;';
-    window.location.href = 'intent:' + dataUrl + S;
+    window.location.href = 'intent:base64,' + b64 + S;
     if(e && e.id) marcarImpresso(e.id); // registra que já foi impresso
   }catch(err){ console.error(err); toast('Não consegui abrir a impressão', '#d23c3c'); }
 }
