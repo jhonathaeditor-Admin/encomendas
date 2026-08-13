@@ -432,13 +432,13 @@ function setPct(n){
   if(el){ el.textContent = n+'%'; el.parentElement.style.setProperty('--pct', n+'%'); }
 }
 function esconderCarregando(){ document.getElementById('carregando').style.display = 'none'; }
-// simula progresso enquanto uma promessa (fn) roda; garante 100% no fim
+// avanço desacelerado (nunca trava): sobe rápido no início e vai afrouxando perto do fim
 async function comCarregando(msg, fn){
   mostrarCarregando(msg);
-  let p = 8; setPct(p);
-  const t = setInterval(()=>{ p = Math.min(90, p + Math.random()*11); setPct(p); }, 240);
+  let p = 5; setPct(p);
+  const t = setInterval(()=>{ p = p + (96 - p)*0.06; setPct(p); }, 180);
   try{ return await fn(); }
-  finally{ clearInterval(t); setPct(100); setTimeout(esconderCarregando, 260); }
+  finally{ clearInterval(t); setPct(100); setTimeout(esconderCarregando, 300); }
 }
 // bip curto (Web Audio) + vibração no sucesso
 let _actx = null;
@@ -749,8 +749,8 @@ async function lerEtiqueta(ev){
   const st = document.getElementById('ocr-status');
   st.innerHTML = '';
   mostrarCarregando('Lendo a etiqueta…');
-  let _prog = 15; setPct(_prog);
-  const _pt = setInterval(()=>{ _prog = Math.min(90, _prog+8); setPct(_prog); }, 260);
+  let _prog = 5; setPct(_prog);
+  const _pt = setInterval(()=>{ _prog = _prog + (96 - _prog)*0.055; setPct(_prog); }, 180);
   try{
     let texto = '', viaIA = false, erroIA = '';
     const ia = await lerEtiquetaIA(file);   // tenta a IA (Gemini) primeiro
