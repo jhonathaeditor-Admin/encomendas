@@ -349,7 +349,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
@@ -584,13 +583,6 @@ async function carregarEncomendas(){
   renderEncomendas();
 }
 
-// ---------- OCR (leitor reutilizável + imagem reduzida = mais rápido) ----------
-let TESS_WORKER = null;
-async function getTessWorker(){
-  if(TESS_WORKER) return TESS_WORKER;
-  TESS_WORKER = await Tesseract.createWorker('por'); // carrega só 1 vez
-  return TESS_WORKER;
-}
 // reduz a foto antes de ler (fotos de celular são enormes e deixam a leitura lenta)
 function reduzirImagem(file, maxLado, qualidade){
   maxLado = maxLado || 1500;
@@ -608,13 +600,6 @@ function reduzirImagem(file, maxLado, qualidade){
     img.src = URL.createObjectURL(file);
   });
 }
-async function lerTexto(file){
-  const menor = await reduzirImagem(file);
-  const worker = await getTessWorker();
-  const {data} = await worker.recognize(menor);
-  return data.text || '';
-}
-
 // ---------- QR CODE ----------
 // desenha um QR no canvas (usado no cupom impresso)
 function desenharQR(ctx, texto, x, y, tamanho){
@@ -667,20 +652,6 @@ async function verFoto(path){
   const {data, error} = await db.storage.from('comprovantes').createSignedUrl(path, 3600);
   if(error || !data){ toast('Não consegui abrir a foto', '#d23c3c'); return; }
   window.open(data.signedUrl, '_blank');
-}
-
-// tenta achar transportadora e código de rastreio no texto lido
-function extrairDados(texto){
-  const t = texto.toUpperCase();
-  let transportadora = '';
-  const marcas = {'CORREIOS':'Correios','MERCADO':'Mercado Livre','SHOPEE':'Shopee','AMAZON':'Amazon','JADLOG':'Jadlog','LOGGI':'Loggi','TOTAL EXPRESS':'Total Express','SEQUOIA':'Sequoia','AZUL':'Azul Cargo'};
-  for(const k in marcas){ if(t.includes(k)){ transportadora = marcas[k]; break; } }
-  // rastreio: padrão Correios (2 letras + 9 números + 2 letras) ou código longo
-  let rastreio = '';
-  const m1 = t.match(/[A-Z]{2}\d{9}[A-Z]{2}/);
-  const m2 = t.match(/\b[A-Z0-9]{12,}\b/);
-  rastreio = m1 ? m1[0] : (m2 ? m2[0] : '');
-  return {transportadora, rastreio};
 }
 
 // converte um arquivo/blob em base64 puro (sem o prefixo data:)
@@ -753,7 +724,7 @@ async function lerEtiqueta(ev){
   const _pt = setInterval(()=>{ _prog = _prog + (96 - _prog)*0.055; setPct(_prog); }, 180);
   try{
     let texto = '', viaIA = false, erroIA = '';
-    const ia = await lerEtiquetaIA(file);   // tenta a IA (Gemini) primeiro
+    const ia = await lerEtiquetaIA(file);   // leitura por IA (Gemini)
     if(ia.dados){
       const dados = ia.dados;
       viaIA = true;
@@ -761,11 +732,7 @@ async function lerEtiqueta(ev){
       if(dados.rastreio) document.getElementById('r-rastreio').value = dados.rastreio;
       texto = `${dados.nome||''} apto ${dados.apartamento||''} bloco ${dados.bloco||''}`;
     } else {
-      erroIA = ia.erro || '';
-      texto = await lerTexto(file);            // reserva: leitor grátis
-      const {transportadora, rastreio} = extrairDados(texto);
-      if(transportadora) definirTransportadora(transportadora);
-      if(rastreio) document.getElementById('r-rastreio').value = rastreio;
+      erroIA = ia.erro || '';   // sem leitor lento: se a IA falhar, a porteira busca na hora
     }
     const cands = candidatosMorador(texto);
     let blocoMorador;
@@ -780,9 +747,9 @@ async function lerEtiqueta(ev){
     }
     const transpAtual = document.getElementById('r-transportadora').value;
     const rastAtual = document.getElementById('r-rastreio').value;
-    st.innerHTML = `<div class="card" style="background:var(--cinza);padding:10px;margin:0">
-      <div class="meta">${viaIA?'🤖 Lido por IA':'🔎 Lido pelo leitor grátis'}</div>
-      ${erroIA?`<div class="meta" style="color:var(--vermelho)">IA indisponível: ${escapeH(erroIA)}</div>`:''}
+    st.innerHTML = `<div class="card" style="background:var(--pagina);padding:12px;margin:0">
+      <div class="meta" style="font-weight:600;color:${viaIA?'var(--verde-tx)':'var(--vermelho)'}">${viaIA?'<i class="ti ti-sparkles"></i> Lido por IA':'<i class="ti ti-alert-circle"></i> IA ocupada — busque o morador manualmente'}</div>
+      ${erroIA?`<div class="meta" style="color:var(--vermelho)">${escapeH(erroIA)}</div>`:''}
       <span class="meta">${transpAtual?'Transportadora: '+escapeH(transpAtual)+'<br>':''}${rastAtual?'Rastreio: '+escapeH(rastAtual):''}</span>
       ${blocoMorador}
       <div class="meta" style="margin-top:8px">⚠️ Confira sempre o apartamento e o bloco antes de registrar.</div>
@@ -1257,16 +1224,11 @@ async function lerBaixaFoto(ev){
   const st = document.getElementById('baixa-status');
   st.innerHTML = '<span class="meta">🔎 Lendo o cupom…</span>';
   let e = null;
-  // 1) tenta o QR Code (rápido e confiável) — cruza com TODAS as encomendas
+  // lê o QR Code (rápido e confiável) — cruza com TODAS as encomendas
   try{
     const qr = await lerQR(file);
     if(qr){ e = encomendaPorCodigoExato(qr.replace(/^ENC:/i,'')); }
   }catch(err){ console.error(err); }
-  // 2) se não tinha QR (cupom antigo), tenta o OCR do texto
-  if(!e){
-    try{ e = acharEncomendaPorCodigo(await lerTexto(file)); }
-    catch(err){ console.error(err); }
-  }
 
   if(e && e.status==='retirada'){
     // JÁ foi retirada antes — avisa pra não duplicar
