@@ -4,84 +4,144 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Central de Encomendas — Spazio Montero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.1.0/dist/tabler-icons.min.css">
 <style>
   :root{
-    --azul:#1f6feb; --azul-esc:#154aa3; --verde:#1a9c53; --vermelho:#d23c3c;
-    --cinza:#f2f4f7; --borda:#d7dce3; --texto:#1a2230; --suave:#6b7686;
+    --azul:#1f6feb; --azul-esc:#1657c9; --azul-2:#3b86ff;
+    --verde:#1a9c53; --verde-bg:#e7f6ee; --verde-tx:#0f6e3c;
+    --vermelho:#e24b4a; --vermelho-bg:#fdecec; --vermelho-tx:#b3312f;
+    --amarelo-bg:#fef3d9; --amarelo-tx:#8a5a00;
+    --azul-bg:#e8f1fe; --azul-tx:#154aa3;
+    --pagina:#f4f6fb; --surface:#ffffff; --borda:#e7eaf1; --borda-2:#dbe0ea;
+    --texto:#141a26; --suave:#69707e; --radius:16px;
+    --sombra:0 1px 2px rgba(20,26,38,.04), 0 6px 18px rgba(20,26,38,.05);
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-       background:var(--cinza);color:var(--texto);-webkit-text-size-adjust:100%}
-  header{background:var(--azul);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:10}
-  header h1{margin:0;font-size:18px;font-weight:700}
-  header small{opacity:.85;font-size:12px}
-  #status-conn{font-size:12px;margin-top:4px}
-  nav{display:flex;background:#fff;border-bottom:1px solid var(--borda);position:sticky;top:56px;z-index:9}
-  nav button{flex:1;padding:14px 4px;border:0;background:none;font-size:15px;font-weight:600;
-             color:var(--suave);border-bottom:3px solid transparent;cursor:pointer}
+  body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+       background:var(--pagina);color:var(--texto);-webkit-text-size-adjust:100%;
+       font-feature-settings:'cv02','cv03','cv04','cv11'}
+  .ti{font-size:1.1em;vertical-align:-.12em}
+  header{background:linear-gradient(135deg,var(--azul),var(--azul-2));color:#fff;padding:14px 16px;
+         position:sticky;top:0;z-index:10}
+  header h1{margin:0;font-size:17px;font-weight:700;letter-spacing:-.2px}
+  header small{opacity:.9;font-size:12px}
+  #status-conn{font-size:11px;margin-top:3px;opacity:.9}
+  .logo-ic{width:36px;height:36px;border-radius:11px;background:rgba(255,255,255,.18);
+           display:flex;align-items:center;justify-content:center;font-size:20px}
+  nav{display:flex;background:var(--surface);border-bottom:1px solid var(--borda);position:sticky;top:60px;
+      z-index:9;overflow-x:auto}
+  nav button{flex:1 0 auto;min-width:78px;padding:11px 6px 9px;border:0;background:none;font-size:12px;
+             font-weight:600;color:var(--suave);border-bottom:3px solid transparent;cursor:pointer;
+             display:flex;flex-direction:column;align-items:center;gap:3px;transition:color .18s}
+  nav button .ti{font-size:20px}
   nav button.ativo{color:var(--azul);border-bottom-color:var(--azul)}
-  main{padding:16px 16px 60px;max-width:640px;margin:0 auto}
-  .card{background:#fff;border:1px solid var(--borda);border-radius:12px;padding:16px;margin-bottom:14px}
-  label{display:block;font-size:13px;font-weight:600;margin:10px 0 4px;color:var(--suave)}
-  input,select,textarea{width:100%;padding:12px;font-size:16px;border:1px solid var(--borda);
-                         border-radius:8px;background:#fff;color:var(--texto)}
-  button.acao{width:100%;padding:14px;font-size:16px;font-weight:700;color:#fff;background:var(--azul);
-              border:0;border-radius:8px;margin-top:16px;cursor:pointer}
-  button.acao:active{background:var(--azul-esc)}
-  button.sec{background:#fff;color:var(--azul);border:1px solid var(--azul)}
+  main{padding:16px 16px 70px;max-width:640px;margin:0 auto}
+  section{animation:fadein .28s ease}
+  @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .card{background:var(--surface);border:1px solid var(--borda);border-radius:var(--radius);padding:16px;
+        margin-bottom:14px;box-shadow:var(--sombra)}
+  h2{font-size:18px;font-weight:700;letter-spacing:-.2px;margin:0 0 4px}
+  label{display:block;font-size:12px;font-weight:600;margin:12px 0 5px;color:var(--suave);
+        text-transform:none;letter-spacing:.1px}
+  input,select,textarea{width:100%;padding:13px;font-size:16px;border:1px solid var(--borda-2);
+                         border-radius:12px;background:var(--surface);color:var(--texto);transition:border-color .15s,box-shadow .15s}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--azul);box-shadow:0 0 0 3px var(--azul-bg)}
+  button.acao{width:100%;padding:14px;font-size:15px;font-weight:600;color:#fff;background:var(--azul);
+              border:0;border-radius:12px;margin-top:14px;cursor:pointer;transition:transform .08s,background .15s;
+              display:inline-flex;align-items:center;justify-content:center;gap:7px}
+  button.acao:active{transform:scale(.98);background:var(--azul-esc)}
+  button.sec{background:var(--surface);color:var(--azul);border:1px solid var(--borda-2);box-shadow:none}
   button.verde{background:var(--verde)}
-  .lista-item{background:#fff;border:1px solid var(--borda);border-radius:12px;padding:14px;margin-bottom:10px;border-left:8px solid var(--borda)}
-  .card-vermelho{border-left-color:var(--vermelho);background:#fff6f6}
-  .card-verde{border-left-color:var(--verde);background:#f4fbf6}
-  .card-cinza{border-left-color:#b9c0cc;background:#fafbfc;opacity:.85}
-  .selo-vermelho,.selo-verde,.selo-cinza{display:inline-block;font-size:11px;font-weight:800;
-       padding:3px 9px;border-radius:20px;margin-bottom:6px;letter-spacing:.3px}
-  .selo-vermelho{background:var(--vermelho);color:#fff}
-  .selo-verde{background:var(--verde);color:#fff}
-  .selo-cinza{background:#b9c0cc;color:#fff}
+  .lista-item{background:var(--surface);border:1px solid var(--borda);border-radius:var(--radius);padding:15px;
+              margin-bottom:11px;border-left:4px solid var(--borda-2);box-shadow:var(--sombra);transition:transform .1s}
+  .lista-item:active{transform:scale(.995)}
+  .card-vermelho{border-left-color:var(--vermelho)}
+  .card-verde{border-left-color:var(--verde)}
+  .card-cinza{border-left-color:#b9c0cc}
+  .selo-vermelho,.selo-verde,.selo-cinza{display:inline-flex;align-items:center;gap:4px;font-size:11px;
+       font-weight:600;padding:4px 10px;border-radius:999px;margin-bottom:8px;letter-spacing:.2px}
+  .selo-vermelho{background:var(--vermelho-bg);color:var(--vermelho-tx)}
+  .selo-verde{background:var(--verde-bg);color:var(--verde-tx)}
+  .selo-cinza{background:#eef0f4;color:#5f6672}
   .li-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-  .apto{font-size:26px;font-weight:800;line-height:1}
-  .nome{font-weight:700;margin-top:2px}
+  .apto{font-size:30px;font-weight:800;line-height:1;letter-spacing:-.5px}
+  .nome{font-weight:600;margin-top:3px}
   .meta{font-size:13px;color:var(--suave);margin-top:4px}
-  .cod{font-family:monospace;font-weight:800;font-size:18px;background:var(--cinza);
-       padding:4px 8px;border-radius:6px;letter-spacing:1px}
-  .tag{font-size:12px;font-weight:700;padding:3px 8px;border-radius:20px}
-  .tag.recebida{background:#fde9c8;color:#8a5a00}
-  .tag.notificada{background:#cfe3ff;color:#154aa3}
-  .tag.retirada{background:#d3f0dd;color:#0f6b39}
-  .vazio{text-align:center;color:var(--suave);padding:30px 10px}
-  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1a2230;color:#fff;
-         padding:12px 18px;border-radius:8px;font-size:14px;z-index:50;opacity:0;transition:.2s;max-width:90%;
-         pointer-events:none}
-  .toast.show{opacity:1}
+  .cod{font-family:'Inter',monospace;font-weight:700;font-size:16px;background:var(--pagina);
+       padding:5px 9px;border-radius:9px;letter-spacing:1px}
+  .tag{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px}
+  .tag.recebida{background:var(--amarelo-bg);color:var(--amarelo-tx)}
+  .tag.notificada{background:var(--azul-bg);color:var(--azul-tx)}
+  .tag.retirada{background:var(--verde-bg);color:var(--verde-tx)}
+  .vazio{text-align:center;color:var(--suave);padding:34px 10px}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(8px);background:#141a26;color:#fff;
+         padding:13px 18px;border-radius:12px;font-size:14px;font-weight:500;z-index:80;opacity:0;transition:.22s;
+         max-width:90%;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .filtro{display:flex;gap:8px;margin-bottom:12px}
-  .filtro button{flex:1;padding:8px;font-size:13px;border:1px solid var(--borda);background:#fff;
-                 border-radius:20px;font-weight:600;color:var(--suave);cursor:pointer}
+  .filtro button{flex:1;padding:9px;font-size:13px;border:1px solid var(--borda-2);background:var(--surface);
+                 border-radius:999px;font-weight:600;color:var(--suave);cursor:pointer;transition:.15s}
   .filtro button.on{background:var(--azul);color:#fff;border-color:var(--azul)}
   .row2{display:flex;gap:10px}
   .row2>div{flex:1}
-  .linkbtn{background:none;border:0;color:var(--azul);font-weight:600;font-size:13px;cursor:pointer;padding:0}
-  .chip{display:inline-block;margin:4px 4px 0 0;padding:9px 13px;border:1px solid var(--borda);border-radius:20px;
-        background:#fff;font-size:14px;font-weight:600;color:var(--texto);cursor:pointer}
+  .linkbtn{background:none;border:0;color:var(--azul);font-weight:600;font-size:13px;cursor:pointer;padding:0;
+           display:inline-flex;align-items:center;gap:4px}
+  .chip{display:inline-flex;align-items:center;gap:5px;margin:5px 5px 0 0;padding:9px 14px;border:1px solid var(--borda-2);
+        border-radius:999px;background:var(--surface);font-size:14px;font-weight:500;color:var(--texto);cursor:pointer;transition:.15s}
   .chip-on{background:var(--azul);color:#fff;border-color:var(--azul)}
-  .picker-item{padding:11px;border-bottom:1px solid var(--borda);cursor:pointer}
-  .picker-item:active{background:var(--cinza)}
+  .picker-item{padding:12px;border-bottom:1px solid var(--borda);cursor:pointer;transition:background .12s}
+  .picker-item:active{background:var(--pagina)}
+  /* Dashboard */
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:6px}
+  .metric{background:var(--surface);border:1px solid var(--borda);border-radius:14px;padding:14px 15px;box-shadow:var(--sombra)}
+  .metric .n{font-size:26px;font-weight:800;line-height:1;letter-spacing:-.5px}
+  .metric .l{font-size:12px;color:var(--suave);margin-top:5px;display:flex;align-items:center;gap:5px}
+  .metric.alerta{border-color:#f4cfcf}.metric.alerta .n{color:var(--vermelho)}
+  .metric.ok .n{color:var(--verde)}
+  .metric.info .n{color:var(--azul)}
+  /* Splash */
+  #splash{position:fixed;inset:0;z-index:300;background:linear-gradient(135deg,var(--azul),var(--azul-2));
+          display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;gap:14px;
+          transition:opacity .4s}
+  #splash .sp-ic{width:76px;height:76px;border-radius:22px;background:rgba(255,255,255,.16);display:flex;
+                 align-items:center;justify-content:center;font-size:40px;animation:pop .5s ease}
+  @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+  /* Carregando (overlay com %) */
+  #carregando{position:fixed;inset:0;z-index:250;background:rgba(15,20,30,.55);backdrop-filter:blur(2px);
+              display:none;align-items:center;justify-content:center}
+  #carregando .box{background:var(--surface);border-radius:18px;padding:26px 30px;text-align:center;min-width:210px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+  .ring{width:64px;height:64px;border-radius:50%;margin:0 auto 12px;
+        background:conic-gradient(var(--azul) var(--pct,0%), var(--borda) 0);
+        display:flex;align-items:center;justify-content:center}
+  .ring::before{content:'';width:48px;height:48px;border-radius:50%;background:var(--surface)}
+  #carregando-pct{position:absolute;font-size:15px;font-weight:700;color:var(--azul)}
+  #carregando-msg{font-size:14px;color:var(--suave);font-weight:500}
 </style>
 </head>
 <body>
 
+<!-- SPLASH -->
+<div id="splash">
+  <div class="sp-ic"><i class="ti ti-package"></i></div>
+  <div style="font-size:19px;font-weight:700;letter-spacing:-.3px">Spazio Montero</div>
+  <div style="font-size:13px;opacity:.9">Central de Encomendas</div>
+</div>
+
 <!-- TELA DE LOGIN -->
-<div id="tela-login" style="display:none;position:fixed;inset:0;background:var(--azul);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div class="card" style="width:100%;max-width:360px;margin:0">
-    <div style="text-align:center;font-size:34px">📦</div>
-    <h2 style="text-align:center;margin:6px 0 2px">Central de Encomendas</h2>
-    <div class="meta" style="text-align:center;margin-bottom:14px">Spazio Montero — Portaria</div>
+<div id="tela-login" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,var(--azul),var(--azul-2));z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div class="card" style="width:100%;max-width:360px;margin:0;padding:26px 22px">
+    <div style="text-align:center;margin-bottom:6px"><span class="logo-ic" style="display:inline-flex;background:var(--azul-bg);color:var(--azul);font-size:26px;width:56px;height:56px;border-radius:16px"><i class="ti ti-package"></i></span></div>
+    <h2 style="text-align:center;margin:8px 0 2px">Central de Encomendas</h2>
+    <div class="meta" style="text-align:center;margin:0 0 16px">Spazio Montero — Portaria</div>
     <label>E-mail</label>
-    <input id="login-email" type="email" inputmode="email" autocomplete="username" placeholder="seu-email@exemplo.com">
+    <input id="login-email" type="email" inputmode="email" autocomplete="username" placeholder="nome@exemplo.com">
     <label>Senha</label>
     <input id="login-senha" type="password" autocomplete="current-password" placeholder="sua senha" onkeydown="if(event.key==='Enter')fazerLogin()">
-    <button class="acao" onclick="fazerLogin()">Entrar</button>
-    <div id="login-erro" class="meta" style="color:var(--vermelho);margin-top:8px;text-align:center"></div>
+    <button class="acao" onclick="fazerLogin()"><i class="ti ti-login-2"></i> Entrar</button>
+    <div id="login-erro" class="meta" style="color:var(--vermelho);margin-top:10px;text-align:center"></div>
   </div>
 </div>
 
@@ -89,32 +149,49 @@
 <div id="app" style="display:none">
 
 <header>
-  <div style="display:flex;justify-content:space-between;align-items:flex-start">
-    <div>
-      <h1>📦 Central de Encomendas</h1>
-      <small>Spazio Montero — Portaria</small>
-      <div id="status-conn">conectando…</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <div style="display:flex;align-items:center;gap:11px">
+      <div class="logo-ic"><i class="ti ti-package"></i></div>
+      <div style="line-height:1.25">
+        <h1>Spazio Montero</h1>
+        <small>Portaria · Central de Encomendas</small>
+        <div id="status-conn">conectando…</div>
+      </div>
     </div>
     <div style="text-align:right">
-      <div id="usuario-info" style="font-size:12px;opacity:.9"></div>
-      <button onclick="fazerLogout()" style="margin-top:4px;background:rgba(255,255,255,.2);color:#fff;border:0;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer">Sair</button>
+      <div id="usuario-info" style="font-size:11px;opacity:.9"></div>
+      <button onclick="fazerLogout()" style="margin-top:5px;background:rgba(255,255,255,.2);color:#fff;border:0;border-radius:9px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="ti ti-logout"></i> Sair</button>
     </div>
   </div>
 </header>
 
 <nav>
-  <button data-aba="receber" class="ativo" onclick="trocarAba('receber')">Receber</button>
-  <button data-aba="encomendas" onclick="trocarAba('encomendas')">Encomendas</button>
-  <button data-aba="moradores" onclick="trocarAba('moradores')">Moradores</button>
-  <button data-aba="relatorios" onclick="trocarAba('relatorios')">Relatórios</button>
+  <button data-aba="inicio" class="ativo" onclick="trocarAba('inicio')"><i class="ti ti-home"></i>Início</button>
+  <button data-aba="receber" onclick="trocarAba('receber')"><i class="ti ti-camera-plus"></i>Receber</button>
+  <button data-aba="encomendas" onclick="trocarAba('encomendas')"><i class="ti ti-package"></i>Encomendas</button>
+  <button data-aba="moradores" onclick="trocarAba('moradores')"><i class="ti ti-users"></i>Moradores</button>
+  <button data-aba="relatorios" onclick="trocarAba('relatorios')"><i class="ti ti-chart-bar"></i>Relatórios</button>
 </nav>
 
 <main>
+  <!-- ABA INÍCIO (dashboard) -->
+  <section id="aba-inicio">
+    <div id="inicio-saudacao" style="margin:2px 0 14px">
+      <h2>Resumo</h2>
+      <div class="meta" id="inicio-data"></div>
+    </div>
+    <div class="metrics" id="inicio-metrics">
+      <div class="metric"><div class="n">—</div><div class="l">carregando…</div></div>
+    </div>
+    <button class="acao sec" onclick="trocarAba('receber')" style="margin-top:14px"><i class="ti ti-camera-plus"></i> Registrar nova encomenda</button>
+    <button class="acao" onclick="trocarAba('encomendas')" style="margin-top:10px"><i class="ti ti-package"></i> Ver encomendas pendentes</button>
+  </section>
+
   <!-- ABA RECEBER -->
-  <section id="aba-receber">
-    <div class="card" style="border:2px dashed var(--azul)">
-      <strong>📷 Ler etiqueta por foto</strong>
-      <p class="meta" style="margin:6px 0 10px">Tire uma foto do rótulo. O app tenta ler e preencher os dados sozinho. Confira sempre antes de salvar.</p>
+  <section id="aba-receber" style="display:none">
+    <div class="card" style="border:1.5px dashed var(--azul);background:var(--azul-bg)">
+      <strong style="display:flex;align-items:center;gap:7px"><i class="ti ti-camera-plus" style="color:var(--azul);font-size:20px"></i> Ler etiqueta por foto</strong>
+      <p class="meta" style="margin:6px 0 10px">Tire uma foto do rótulo. A IA lê e preenche os dados sozinha. Confira sempre antes de salvar.</p>
       <input type="file" id="r-foto" accept="image/*" capture="environment" onchange="lerEtiqueta(event)">
       <div id="ocr-status" style="margin-top:10px"></div>
       <img id="ocr-preview" style="display:none;max-width:100%;border-radius:8px;margin-top:10px;border:1px solid var(--borda)">
@@ -144,17 +221,17 @@
       <label>Observações (opcional)</label>
       <input id="r-obs" placeholder="Ex.: caixa grande, frágil">
 
-      <button class="acao" onclick="salvarEncomenda()">Registrar encomenda</button>
+      <button class="acao" onclick="salvarEncomenda()"><i class="ti ti-circle-plus"></i> Registrar encomenda</button>
     </div>
     <div id="r-recibo"></div>
   </section>
 
   <!-- ABA ENCOMENDAS -->
   <section id="aba-encomendas" style="display:none">
-    <div class="card" style="border:2px dashed var(--verde)">
-      <strong>🔳 Dar baixa por QR</strong>
+    <div class="card" style="border:1.5px dashed var(--verde);background:var(--verde-bg)">
+      <strong style="display:flex;align-items:center;gap:7px"><i class="ti ti-qrcode" style="color:var(--verde);font-size:20px"></i> Dar baixa por QR</strong>
       <p class="meta" style="margin:6px 0 10px">Escaneie o QR do cupom assinado. A câmera lê na hora, dá baixa e guarda a foto como comprovante.</p>
-      <button class="acao verde" onclick="abrirScanner()">📷 Escanear QR (câmera)</button>
+      <button class="acao verde" onclick="abrirScanner()"><i class="ti ti-scan"></i> Escanear QR (câmera)</button>
       <div class="meta" style="text-align:center;margin:8px 0 4px">ou, se preferir, tire uma foto do cupom:</div>
       <input type="file" id="b-foto" accept="image/*" capture="environment" onchange="lerBaixaFoto(event)">
       <div id="baixa-status" style="margin-top:10px"></div>
@@ -174,7 +251,7 @@
   <section id="aba-moradores" style="display:none">
     <div class="card gestao-only" id="card-cadastrar-morador">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <strong>Cadastrar morador</strong>
+        <strong style="display:flex;align-items:center;gap:7px"><i class="ti ti-user-plus" style="color:var(--azul)"></i> Cadastrar morador</strong>
         <button class="linkbtn" onclick="toggleFormMorador()">mostrar/ocultar</button>
       </div>
       <div id="form-morador">
@@ -186,13 +263,13 @@
         <input id="m-nome" placeholder="Nome completo">
         <label>Telefone (WhatsApp)</label>
         <input id="m-telefone" inputmode="tel" placeholder="Ex.: 11 91234-5678">
-        <button class="acao" onclick="salvarMorador()">Salvar morador</button>
+        <button class="acao" onclick="salvarMorador()"><i class="ti ti-user-plus"></i> Salvar morador</button>
       </div>
     </div>
 
     <div class="card gestao-only" id="card-importar">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <strong>📄 Importar planilha</strong>
+        <strong style="display:flex;align-items:center;gap:7px"><i class="ti ti-file-spreadsheet" style="color:var(--azul)"></i> Importar planilha</strong>
         <button class="linkbtn" onclick="toggleImport()">mostrar/ocultar</button>
       </div>
       <div id="bloco-import">
@@ -220,7 +297,7 @@
   <!-- ABA RELATÓRIOS -->
   <section id="aba-relatorios" style="display:none">
     <div class="card">
-      <strong>📊 Gerar relatório</strong>
+      <h2 style="display:flex;align-items:center;gap:8px"><i class="ti ti-chart-bar" style="color:var(--azul)"></i> Gerar relatório</h2>
       <div class="row2">
         <div><label>Bloco</label><select id="rel-bloco"><option value="">Todos</option></select></div>
         <div><label>Situação</label>
@@ -240,7 +317,7 @@
         <option value="30">Últimos 30 dias</option>
         <option value="90">Últimos 90 dias</option>
       </select>
-      <button class="acao" onclick="gerarRelatorio()">Gerar relatório</button>
+      <button class="acao" onclick="gerarRelatorio()"><i class="ti ti-file-analytics"></i> Gerar relatório</button>
     </div>
     <div id="rel-resultado"></div>
   </section>
@@ -258,6 +335,15 @@
   <button onclick="fecharScanner()" style="position:absolute;bottom:26px;left:50%;transform:translateX(-50%);padding:14px 28px;border:0;border-radius:30px;background:#fff;color:#1a2230;font-size:16px;font-weight:700">Cancelar</button>
 </div>
 <canvas id="scanner-canvas" style="display:none"></canvas>
+
+<!-- Overlay de carregamento com % -->
+<div id="carregando">
+  <div class="box">
+    <div class="ring"><span id="carregando-pct">0%</span></div>
+    <div id="carregando-msg">Processando…</div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 </div><!-- fim #app -->
 
@@ -301,11 +387,13 @@ async function entrarNoApp(user){
     PAPEL = (data && data.papel) || 'portaria';
   }catch(e){ PAPEL = 'portaria'; }
   document.getElementById('tela-login').style.display = 'none';
+  document.getElementById('splash').style.display = 'none';
   document.getElementById('app').style.display = '';
-  document.getElementById('usuario-info').textContent =
-    (PAPEL==='gestao'?'👤 Gestão':'👤 Portaria') + ' · ' + (user.email||'');
+  document.getElementById('usuario-info').innerHTML =
+    '<i class="ti '+(PAPEL==='gestao'?'ti-shield-check':'ti-user')+'"></i> '+(PAPEL==='gestao'?'Gestão':'Portaria');
   configurarPorPerfil();
   await iniciarDados();
+  trocarAba('inicio');
 }
 function configurarPorPerfil(){
   const soGestao = PAPEL === 'gestao';
@@ -327,20 +415,88 @@ function gerarCodigo(){
 function fmtData(iso){
   if(!iso) return "";
   const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR')+" "+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'}).replace('.','')
+    +", "+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 }
 function escapeH(s){return (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+// ---------- carregamento (%), som e vibração ----------
+function mostrarCarregando(msg){
+  document.getElementById('carregando-msg').textContent = msg || 'Processando…';
+  setPct(0);
+  document.getElementById('carregando').style.display = 'flex';
+}
+function setPct(n){
+  n = Math.max(0, Math.min(100, Math.round(n)));
+  const el = document.getElementById('carregando-pct');
+  if(el){ el.textContent = n+'%'; el.parentElement.style.setProperty('--pct', n+'%'); }
+}
+function esconderCarregando(){ document.getElementById('carregando').style.display = 'none'; }
+// simula progresso enquanto uma promessa (fn) roda; garante 100% no fim
+async function comCarregando(msg, fn){
+  mostrarCarregando(msg);
+  let p = 8; setPct(p);
+  const t = setInterval(()=>{ p = Math.min(90, p + Math.random()*11); setPct(p); }, 240);
+  try{ return await fn(); }
+  finally{ clearInterval(t); setPct(100); setTimeout(esconderCarregando, 260); }
+}
+// bip curto (Web Audio) + vibração no sucesso
+let _actx = null;
+function sucesso(){
+  try{ navigator.vibrate && navigator.vibrate(60); }catch(e){}
+  try{
+    _actx = _actx || new (window.AudioContext||window.webkitAudioContext)();
+    const o = _actx.createOscillator(), g = _actx.createGain();
+    o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(_actx.destination);
+    g.gain.setValueAtTime(.0001,_actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.25,_actx.currentTime+.01);
+    g.gain.exponentialRampToValueAtTime(.0001,_actx.currentTime+.16);
+    o.start(); o.stop(_actx.currentTime+.17);
+  }catch(e){}
+}
 
 // ---------- navegação ----------
 function trocarAba(aba){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('ativo', b.dataset.aba===aba));
+  document.getElementById('aba-inicio').style.display    = aba==='inicio' ? '' : 'none';
   document.getElementById('aba-receber').style.display   = aba==='receber' ? '' : 'none';
   document.getElementById('aba-encomendas').style.display= aba==='encomendas' ? '' : 'none';
   document.getElementById('aba-moradores').style.display = aba==='moradores' ? '' : 'none';
   document.getElementById('aba-relatorios').style.display= aba==='relatorios' ? '' : 'none';
+  window.scrollTo({top:0, behavior:'smooth'});
+  if(aba==='inicio') renderInicio();
   if(aba==='encomendas') carregarEncomendas();
   if(aba==='moradores') renderMoradores();
   if(aba==='relatorios') prepararRelatorio();
+}
+
+// ---------- DASHBOARD (aba Início) ----------
+async function renderInicio(){
+  const dt = document.getElementById('inicio-data');
+  if(dt) dt.textContent = new Date().toLocaleDateString('pt-BR', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+  if(!ENCOMENDAS.length) await carregarEncomendas();
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).getTime();
+  const ehHoje = (iso)=> iso && new Date(iso).getTime() >= hoje.getTime();
+  const pend = ENCOMENDAS.filter(e=>e.status!=='retirada');
+  const recebidasHoje = ENCOMENDAS.filter(e=>ehHoje(e.recebida_em)).length;
+  const retiradasHoje = ENCOMENDAS.filter(e=>e.status==='retirada' && ehHoje(e.retirada_em)).length;
+  const atrasadas = pend.filter(e=>diasEspera(e.recebida_em) >= 7).length;
+  const recebidasMes = ENCOMENDAS.filter(e=>e.recebida_em && new Date(e.recebida_em).getTime() >= inicioMes).length;
+  const avisadas = ENCOMENDAS.filter(e=>e.status==='notificada').length;
+  const cards = [
+    {n:pend.length, l:'pendentes', ic:'ti-clock-hour-4', cls:''},
+    {n:recebidasHoje, l:'recebidas hoje', ic:'ti-inbox', cls:'info'},
+    {n:atrasadas, l:'atrasadas (+7 dias)', ic:'ti-alert-triangle', cls:'alerta'},
+    {n:avisadas, l:'avisadas aguardando', ic:'ti-bell-ringing', cls:'info'},
+    {n:retiradasHoje, l:'retiradas hoje', ic:'ti-circle-check', cls:'ok'},
+    {n:recebidasMes, l:'recebidas no mês', ic:'ti-calendar-month', cls:''},
+  ];
+  document.getElementById('inicio-metrics').innerHTML = cards.map(c=>`
+    <div class="metric ${c.cls}">
+      <div class="n">${c.n}</div>
+      <div class="l"><i class="ti ${c.ic}"></i>${c.l}</div>
+    </div>`).join('');
 }
 
 // ---------- carregar dados ----------
@@ -590,7 +746,10 @@ async function lerEtiqueta(ev){
   const prev = document.getElementById('ocr-preview');
   prev.src = URL.createObjectURL(file); prev.style.display='';
   const st = document.getElementById('ocr-status');
-  st.innerHTML = '<span class="meta">🔎 Lendo a etiqueta…</span>';
+  st.innerHTML = '';
+  mostrarCarregando('Lendo a etiqueta…');
+  let _prog = 15; setPct(_prog);
+  const _pt = setInterval(()=>{ _prog = Math.min(90, _prog+8); setPct(_prog); }, 260);
   try{
     let texto = '', viaIA = false, erroIA = '';
     const ia = await lerEtiquetaIA(file);   // tenta a IA (Gemini) primeiro
@@ -630,6 +789,8 @@ async function lerEtiqueta(ev){
   }catch(err){
     console.error(err);
     st.innerHTML = '<span class="meta" style="color:var(--vermelho)">Não consegui ler a foto. Preencha manualmente (a foto será guardada mesmo assim).</span>';
+  }finally{
+    clearInterval(_pt); setPct(100); setTimeout(esconderCarregando, 250);
   }
 }
 
@@ -643,28 +804,31 @@ async function salvarEncomenda(){
 
   if(!morador_id){ toast('Escolha o morador', '#d23c3c'); return; }
 
-  // sobe a foto (se houver)
-  let foto_url = null;
-  if(FOTO_SELECIONADA){
-    try{ toast('Enviando foto…', '#1a2230'); foto_url = await uploadArquivo(FOTO_SELECIONADA, 'recebimento'); }
-    catch(err){ console.error(err); toast('Não consegui enviar a foto — encomenda será salva sem ela', '#d23c3c'); }
-  }
-
   const codigo = gerarCodigo();
-  const registro = {
-    morador_id,
-    transportadora: transportadora || null,
-    codigo_rastreio: rastreio || null,
-    codigo_retirada: codigo,
-    peso: pesoRaw ? parseFloat(pesoRaw) : null,
-    observacoes: obs || null,
-    foto_url: foto_url,
-    porteiro_recebeu: null,
-    status: 'recebida'
-  };
-
-  const {data, error} = await db.from('encomendas').insert(registro).select().single();
+  let data, error;
+  await comCarregando('Salvando encomenda…', async ()=>{
+    // sobe a foto (se houver)
+    let foto_url = null;
+    if(FOTO_SELECIONADA){
+      try{ foto_url = await uploadArquivo(FOTO_SELECIONADA, 'recebimento'); }
+      catch(err){ console.error(err); toast('Não consegui enviar a foto — encomenda salva sem ela', '#d23c3c'); }
+    }
+    const registro = {
+      morador_id,
+      transportadora: transportadora || null,
+      codigo_rastreio: rastreio || null,
+      codigo_retirada: codigo,
+      peso: pesoRaw ? parseFloat(pesoRaw) : null,
+      observacoes: obs || null,
+      foto_url: foto_url,
+      porteiro_recebeu: null,
+      status: 'recebida'
+    };
+    const res = await db.from('encomendas').insert(registro).select().single();
+    data = res.data; error = res.error;
+  });
   if(error){ toast('Erro ao salvar: '+error.message, '#d23c3c'); console.error(error); return; }
+  sucesso();
 
   const m = MORADORES.find(x=>x.id===morador_id) || {};
   mostrarRecibo(m, data);
@@ -689,20 +853,21 @@ let ULTIMO_RECIBO = null;
 function mostrarRecibo(m, e){
   ULTIMO_RECIBO = { m, e };
   document.getElementById('r-recibo').innerHTML = `
-    <div class="card" style="border:2px solid var(--verde)">
+    <div class="card" style="border:1.5px solid var(--verde);background:var(--verde-bg)">
+      <div style="display:flex;align-items:center;gap:7px;color:var(--verde-tx);font-weight:600;font-size:14px;justify-content:center;margin-bottom:6px"><i class="ti ti-circle-check" style="font-size:18px"></i> Encomenda registrada</div>
       <div style="text-align:center">
-        <div style="font-size:13px;color:var(--suave)">APARTAMENTO</div>
-        <div class="apto" style="font-size:42px">${escapeH(m.apartamento||'?')}${m.bloco?' <span style="font-size:22px">Bl '+escapeH(m.bloco)+'</span>':''}</div>
+        <div style="font-size:12px;color:var(--suave);letter-spacing:.3px">APARTAMENTO</div>
+        <div class="apto" style="font-size:46px">${escapeH(m.apartamento||'?')}${m.bloco?' <span style="font-size:20px;color:var(--suave)">Bl '+escapeH(m.bloco)+'</span>':''}</div>
         <div class="nome">${escapeH(m.nome||'')}</div>
       </div>
       <div style="text-align:center;margin:14px 0">
-        <div style="font-size:13px;color:var(--suave)">CÓDIGO DE RETIRADA</div>
-        <div class="cod" style="font-size:32px;display:inline-block;margin-top:4px">${e.codigo_retirada}</div>
+        <div style="font-size:12px;color:var(--suave);letter-spacing:.3px">CÓDIGO DE RETIRADA</div>
+        <div class="cod" style="font-size:30px;display:inline-block;margin-top:4px">${e.codigo_retirada}</div>
       </div>
       <div class="meta" style="text-align:center">
         ${e.transportadora?escapeH(e.transportadora)+' · ':''}${e.codigo_rastreio?escapeH(e.codigo_rastreio)+' · ':''}${fmtData(e.recebida_em)}
       </div>
-      <button class="acao" style="margin-top:14px" onclick="imprimirUltimoRecibo()">🖨️ Imprimir cupom</button>
+      <button class="acao" style="margin-top:14px" onclick="imprimirUltimoRecibo()"><i class="ti ti-printer"></i> Imprimir cupom</button>
     </div>`;
 }
 
@@ -867,39 +1032,37 @@ function renderEncomendas(){
     const m = MORADORES.find(x=>x.id===e.morador_id) || {};
     const retirada = e.status==='retirada';
     // cor do card: vermelho=falta avisar | verde=já avisado | cinza=retirada
-    let classeCor = 'card-vermelho', selo = '⚠️ FALTA AVISAR', seloClasse = 'selo-vermelho';
-    if(e.status==='notificada'){ classeCor='card-verde'; selo='✓ JÁ AVISADO'; seloClasse='selo-verde'; }
-    if(retirada){ classeCor='card-cinza'; selo='✓ RETIRADA'; seloClasse='selo-cinza'; }
+    let classeCor='card-vermelho', selo='<i class="ti ti-bell"></i>Falta avisar', seloClasse='selo-vermelho';
+    if(e.status==='notificada'){ classeCor='card-verde'; selo='<i class="ti ti-bell-ringing"></i>Avisado'; seloClasse='selo-verde'; }
+    if(retirada){ classeCor='card-cinza'; selo='<i class="ti ti-circle-check"></i>Retirada'; seloClasse='selo-cinza'; }
     // dias parada na portaria (só p/ pendentes)
     const dias = diasEspera(e.recebida_em);
-    const corDias = dias>=7 ? 'var(--vermelho)' : (dias>=3 ? '#8a5a00' : 'var(--suave)');
+    const corDias = dias>=7 ? 'var(--vermelho)' : (dias>=3 ? 'var(--amarelo-tx)' : 'var(--suave)');
     const textoDias = dias===0 ? 'Chegou hoje' : (dias+' dia'+(dias>1?'s':'')+' na portaria');
     return `<div class="lista-item ${classeCor}">
       <div class="li-topo">
         <div>
           <div class="${seloClasse}">${selo}</div>
-          <div class="apto">${escapeH(m.apartamento||'?')}${m.bloco?' <span style="font-size:15px">Bl '+escapeH(m.bloco)+'</span>':''}</div>
+          <div class="apto">${escapeH(m.apartamento||'?')}${m.bloco?' <span style="font-size:15px;color:var(--suave)">Bl '+escapeH(m.bloco)+'</span>':''}</div>
           <div class="nome">${escapeH(m.nome||'(morador removido)')}</div>
-          <div class="meta">${e.transportadora?escapeH(e.transportadora)+' · ':''}${fmtData(e.recebida_em)}</div>
-          <div class="meta" style="font-weight:700;color:${e.impresso?'var(--verde)':'var(--vermelho)'}">${e.impresso?'🖨️ Cupom impresso':'🖨️ Falta imprimir'}</div>
-          ${retirada?'':`<div class="meta" style="font-weight:700;color:${corDias}">⏳ ${textoDias}</div>`}
-          ${retirada?`<div class="meta">Retirado por ${escapeH(e.retirada_por||'?')} em ${fmtData(e.retirada_em)}</div>`:''}
+          <div class="meta">${e.transportadora?'<i class="ti ti-truck-delivery"></i> '+escapeH(e.transportadora)+' · ':''}${fmtData(e.recebida_em)}</div>
+          <div class="meta" style="font-weight:600;color:${e.impresso?'var(--verde)':'var(--vermelho)'}"><i class="ti ${e.impresso?'ti-printer':'ti-printer-off'}"></i> ${e.impresso?'Cupom impresso':'Falta imprimir'}</div>
+          ${retirada?'':`<div class="meta" style="font-weight:600;color:${corDias}"><i class="ti ti-clock"></i> ${textoDias}</div>`}
+          ${retirada?`<div class="meta"><i class="ti ti-user-check"></i> Retirado por ${escapeH(e.retirada_por||'?')} em ${fmtData(e.retirada_em)}</div>`:''}
         </div>
         <div style="text-align:right">
           <div class="cod">${e.codigo_retirada}</div>
-          ${e.foto_url?`<button class="linkbtn" style="display:block;margin-top:8px" onclick="verFoto('${escapeH(e.foto_url)}')">📷 Ver recebimento</button>`:''}
-          ${e.foto_retirada_url?`<button class="linkbtn" style="display:block;margin-top:6px;color:var(--verde)" onclick="verFoto('${escapeH(e.foto_retirada_url)}')">📷 Ver comprovante</button>`:''}
+          ${e.foto_url?`<button class="linkbtn" style="display:block;margin-top:8px;margin-left:auto" onclick="verFoto('${escapeH(e.foto_url)}')"><i class="ti ti-photo"></i> Recebimento</button>`:''}
+          ${e.foto_retirada_url?`<button class="linkbtn" style="display:block;margin-top:6px;margin-left:auto;color:var(--verde)" onclick="verFoto('${escapeH(e.foto_retirada_url)}')"><i class="ti ti-photo-check"></i> Comprovante</button>`:''}
         </div>
       </div>
-      <button class="acao ${e.impresso?'sec':''}" style="margin-top:12px" onclick="imprimirEncomenda('${e.id}')">${e.impresso?'🔁 Reimprimir cupom':'🖨️ Imprimir cupom'}</button>
+      <button class="acao ${e.impresso?'sec':''}" style="margin-top:12px" onclick="imprimirEncomenda('${e.id}')"><i class="ti ${e.impresso?'ti-refresh':'ti-printer'}"></i> ${e.impresso?'Reimprimir cupom':'Imprimir cupom'}</button>
       ${retirada?'':`
-        <button class="acao sec" style="margin-top:8px" onclick="avisarWhatsapp('${e.id}')">
-          ${e.status==='notificada'?'🔁 Avisar de novo':'💬 Avisar no WhatsApp'}
-        </button>
-        <button class="acao verde" style="margin-top:8px" onclick="darBaixa('${e.id}')">📷 Dar baixa (foto do cupom)</button>`}
-      ${retirada?`<div style="text-align:center;margin-top:10px"><button class="linkbtn" style="color:#8a5a00" onclick="reverterBaixa('${e.id}')">↩️ Desfazer baixa (foi engano)</button></div>`:''}
+        <button class="acao sec" style="margin-top:8px" onclick="avisarWhatsapp('${e.id}')"><i class="ti ti-brand-whatsapp"></i> ${e.status==='notificada'?'Avisar de novo':'Avisar no WhatsApp'}</button>
+        <button class="acao verde" style="margin-top:8px" onclick="darBaixa('${e.id}')"><i class="ti ti-camera-check"></i> Dar baixa (foto do cupom)</button>`}
+      ${retirada?`<div style="text-align:center;margin-top:10px"><button class="linkbtn" style="color:var(--amarelo-tx)" onclick="reverterBaixa('${e.id}')"><i class="ti ti-arrow-back-up"></i> Desfazer baixa (foi engano)</button></div>`:''}
       ${PAPEL==='gestao'?`<div style="text-align:center;margin-top:10px">
-        <button class="linkbtn" style="color:var(--vermelho)" onclick="excluirEncomenda('${e.id}')">🗑️ Excluir esta encomenda</button>
+        <button class="linkbtn" style="color:var(--vermelho)" onclick="excluirEncomenda('${e.id}')"><i class="ti ti-trash"></i> Excluir esta encomenda</button>
       </div>`:''}
     </div>`;
   }).join('');
@@ -952,7 +1115,7 @@ async function marcarNotificado(e, m){
       encomenda_id: e.id, morador_id: m.id||null, canal:'whatsapp',
       telefone_destino: m.telefone||null, status_envio:'enviada', enviada_em: new Date().toISOString()
     });
-    toast('✅ WhatsApp aberto — é só apertar enviar', '#1a9c53');
+    sucesso(); toast('✅ WhatsApp aberto — é só apertar enviar', '#1a9c53');
     carregarEncomendas();
   }catch(err){ console.error(err); }
 }
@@ -982,7 +1145,7 @@ async function baixaManualComFoto(ev){
     foto_retirada_url: foto_url, assinatura_url: foto_url
   }).eq('id', e.id);
   if(error){ toast('Erro ao dar baixa', '#d23c3c'); console.error(error); return; }
-  toast('✅ Baixa registrada com comprovante!', '#1a9c53');
+  sucesso(); toast('✅ Baixa registrada com comprovante!', '#1a9c53');
   carregarEncomendas();
 }
 
@@ -1201,7 +1364,7 @@ async function confirmarBaixaFoto(){
     foto_retirada_url: foto_url, assinatura_url: foto_url
   }).eq('id', encomenda.id);
   if(error){ toast('Erro ao dar baixa: '+error.message, '#d23c3c'); console.error(error); return; }
-  toast('✅ Baixa registrada com comprovante!', '#1a9c53');
+  sucesso(); toast('✅ Baixa registrada com comprovante!', '#1a9c53');
   cancelarBaixaFoto();
   carregarEncomendas();
 }
@@ -1415,8 +1578,8 @@ async function gerarRelatorio(){
   const qMor = normalizar(document.getElementById('rel-morador').value);
   const dias = parseInt(document.getElementById('rel-periodo').value)||0;
   const box = document.getElementById('rel-resultado');
-  box.innerHTML = '<div class="meta" style="padding:10px">Gerando…</div>';
-  if(!ENCOMENDAS.length) await carregarEncomendas();
+  box.innerHTML = '';
+  await comCarregando('Gerando relatório…', async ()=>{ await carregarEncomendas(); });
   const limite = dias>0 ? Date.now()-dias*86400000 : 0;
   let linhas = ENCOMENDAS.map(e=>({e, m: MORADORES.find(x=>x.id===e.morador_id)||{}}));
   linhas = linhas.filter(({e,m})=>{
@@ -1438,7 +1601,7 @@ async function gerarRelatorio(){
         <div style="flex:1"><div style="font-size:24px;font-weight:800;color:var(--vermelho)">${pendentes}</div><div class="meta">pendentes</div></div>
         <div style="flex:1"><div style="font-size:24px;font-weight:800;color:var(--verde)">${retiradas}</div><div class="meta">retiradas</div></div>
       </div>
-      <button class="acao sec" style="margin-top:12px" onclick="baixarRelatorioCSV()">⬇️ Baixar planilha (CSV)</button>
+      <button class="acao sec" style="margin-top:12px" onclick="baixarRelatorioCSV()"><i class="ti ti-download"></i> Baixar planilha (CSV)</button>
     </div>
     ${linhas.length ? linhas.map(({e,m})=>`
       <div class="lista-item">
@@ -1480,10 +1643,14 @@ async function iniciarDados(){
 
 // ---------- inicialização: checa login primeiro ----------
 (async function init(){
+  const inicio = Date.now();
   const {data} = await db.auth.getSession();
+  const espera = Math.max(0, 900 - (Date.now()-inicio)); // splash mínima ~0,9s
+  await new Promise(r=>setTimeout(r, espera));
   if(data && data.session && data.session.user){
     await entrarNoApp(data.session.user);
   } else {
+    document.getElementById('splash').style.display = 'none';
     document.getElementById('tela-login').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
   }
