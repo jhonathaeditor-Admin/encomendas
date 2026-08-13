@@ -666,7 +666,7 @@ function blobParaBase64(blob){
 // pede pro Gemini (via Edge Function) ler o rótulo; devolve {dados} ou {erro}
 async function lerEtiquetaIA(file){
   try{
-    const menor = await reduzirImagem(file, 1000, 0.68); // menor e mais leve = Gemini responde mais rápido
+    const menor = await reduzirImagem(file, 1400, 0.82); // nítida o bastante pra ler o nome pequeno, ainda leve
     const b64 = await blobParaBase64(menor);
     const {data, error} = await db.functions.invoke('ler-etiqueta', { body:{ imagemBase64:b64, mime:'image/jpeg' } });
     if(error){
@@ -723,14 +723,17 @@ async function lerEtiqueta(ev){
   let _prog = 5; setPct(_prog);
   const _pt = setInterval(()=>{ _prog = _prog + (96 - _prog)*0.055; setPct(_prog); }, 180);
   try{
-    let texto = '', viaIA = false, erroIA = '';
+    let texto = '', viaIA = false, erroIA = '', dadosIA = null;
     const ia = await lerEtiquetaIA(file);   // leitura por IA (Gemini)
     if(ia.dados){
-      const dados = ia.dados;
+      dadosIA = ia.dados;
       viaIA = true;
-      if(dados.transportadora) definirTransportadora(dados.transportadora);
-      if(dados.rastreio) document.getElementById('r-rastreio').value = dados.rastreio;
-      texto = `${dados.nome||''} apto ${dados.apartamento||''} bloco ${dados.bloco||''}`;
+      if(dadosIA.transportadora) definirTransportadora(dadosIA.transportadora);
+      if(dadosIA.rastreio) document.getElementById('r-rastreio').value = dadosIA.rastreio;
+      texto = `${dadosIA.nome||''} apto ${dadosIA.apartamento||''} bloco ${dadosIA.bloco||''}`;
+      // já joga o que a IA leu na busca de morador (apto se tiver, senão o nome)
+      const buscaAuto = (dadosIA.apartamento||'').trim() || (dadosIA.nome||'').trim();
+      if(buscaAuto){ document.getElementById('r-morador-busca').value = buscaAuto; filtrarMoradorPicker(); }
     } else {
       erroIA = ia.erro || '';   // sem leitor lento: se a IA falhar, a porteira busca na hora
     }
@@ -750,6 +753,7 @@ async function lerEtiqueta(ev){
     st.innerHTML = `<div class="card" style="background:var(--pagina);padding:12px;margin:0">
       <div class="meta" style="font-weight:600;color:${viaIA?'var(--verde-tx)':'var(--vermelho)'}">${viaIA?'<i class="ti ti-sparkles"></i> Lido por IA':'<i class="ti ti-alert-circle"></i> IA ocupada — busque o morador manualmente'}</div>
       ${erroIA?`<div class="meta" style="color:var(--vermelho)">${escapeH(erroIA)}</div>`:''}
+      ${dadosIA?`<div class="meta" style="margin-top:4px">IA leu: <b>${escapeH(dadosIA.nome||'—')}</b>${dadosIA.apartamento?' · apto '+escapeH(dadosIA.apartamento):''}${dadosIA.bloco?' · bloco '+escapeH(dadosIA.bloco):''}</div>`:''}
       <span class="meta">${transpAtual?'Transportadora: '+escapeH(transpAtual)+'<br>':''}${rastAtual?'Rastreio: '+escapeH(rastAtual):''}</span>
       ${blocoMorador}
       <div class="meta" style="margin-top:8px">⚠️ Confira sempre o apartamento e o bloco antes de registrar.</div>
