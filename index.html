@@ -591,9 +591,10 @@ async function getTessWorker(){
   TESS_WORKER = await Tesseract.createWorker('por'); // carrega só 1 vez
   return TESS_WORKER;
 }
-// reduz a foto antes de ler (fotos de celular são enormes e deixam o OCR lento)
-function reduzirImagem(file, maxLado){
+// reduz a foto antes de ler (fotos de celular são enormes e deixam a leitura lenta)
+function reduzirImagem(file, maxLado, qualidade){
   maxLado = maxLado || 1500;
+  qualidade = qualidade || 0.85;
   return new Promise((resolve)=>{
     const img = new Image();
     img.onload = ()=>{
@@ -601,7 +602,7 @@ function reduzirImagem(file, maxLado){
       const cw = Math.round(img.width*escala), ch = Math.round(img.height*escala);
       const c = document.createElement('canvas'); c.width=cw; c.height=ch;
       c.getContext('2d').drawImage(img, 0, 0, cw, ch);
-      c.toBlob(b=>resolve(b||file), 'image/jpeg', 0.85);
+      c.toBlob(b=>resolve(b||file), 'image/jpeg', qualidade);
     };
     img.onerror = ()=>resolve(file);
     img.src = URL.createObjectURL(file);
@@ -694,7 +695,7 @@ function blobParaBase64(blob){
 // pede pro Gemini (via Edge Function) ler o rótulo; devolve {dados} ou {erro}
 async function lerEtiquetaIA(file){
   try{
-    const menor = await reduzirImagem(file, 1200);
+    const menor = await reduzirImagem(file, 1000, 0.68); // menor e mais leve = Gemini responde mais rápido
     const b64 = await blobParaBase64(menor);
     const {data, error} = await db.functions.invoke('ler-etiqueta', { body:{ imagemBase64:b64, mime:'image/jpeg' } });
     if(error){
