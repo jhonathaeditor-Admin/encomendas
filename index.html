@@ -85,6 +85,11 @@
   .filtro button{flex:1;padding:9px;font-size:13px;border:1px solid var(--borda-2);background:var(--surface);
                  border-radius:999px;font-weight:600;color:var(--suave);cursor:pointer;transition:.15s}
   .filtro button.on{background:var(--azul);color:#fff;border-color:var(--azul)}
+  .filtro-ativo{display:flex;align-items:center;gap:8px;background:var(--azul-bg);color:var(--azul-tx);
+                border:1px solid #cfe0fb;border-radius:12px;padding:9px 12px;margin-bottom:10px;font-size:13px;font-weight:600}
+  .filtro-ativo .linkbtn{margin-left:auto}
+  .metric[role=button]{cursor:pointer;transition:transform .08s,box-shadow .15s}
+  .metric[role=button]:active{transform:scale(.98)}
   .row2{display:flex;gap:10px}
   .row2>div{flex:1}
   .linkbtn{background:none;border:0;color:var(--azul);font-weight:600;font-size:13px;cursor:pointer;padding:0;
@@ -243,6 +248,11 @@
       <button data-f="retiradas" onclick="setFiltro('retiradas')">Retiradas</button>
       <button data-f="todas" onclick="setFiltro('todas')">Todas</button>
     </div>
+    <div class="filtro">
+      <button data-f="falta_avisar" onclick="setFiltro('falta_avisar')"><i class="ti ti-bell"></i> Falta avisar</button>
+      <button data-f="avisado" onclick="setFiltro('avisado')"><i class="ti ti-bell-ringing"></i> Avisado</button>
+    </div>
+    <div id="enc-filtro-ativo" style="display:none"></div>
     <div id="enc-count" class="meta" style="margin-bottom:8px;font-weight:700"></div>
     <div id="lista-encomendas"><div class="vazio">Carregando…</div></div>
   </section>
@@ -483,18 +493,20 @@ async function renderInicio(){
   const atrasadas = pend.filter(e=>diasEspera(e.recebida_em) >= 7).length;
   const recebidasMes = ENCOMENDAS.filter(e=>e.recebida_em && new Date(e.recebida_em).getTime() >= inicioMes).length;
   const avisadas = ENCOMENDAS.filter(e=>e.status==='notificada').length;
+  const faltaAvisar = ENCOMENDAS.filter(e=>e.status==='recebida').length;
   const cards = [
-    {n:pend.length, l:'pendentes', ic:'ti-clock-hour-4', cls:''},
-    {n:recebidasHoje, l:'recebidas hoje', ic:'ti-inbox', cls:'info'},
-    {n:atrasadas, l:'atrasadas (+7 dias)', ic:'ti-alert-triangle', cls:'alerta'},
-    {n:avisadas, l:'avisadas aguardando', ic:'ti-bell-ringing', cls:'info'},
-    {n:retiradasHoje, l:'retiradas hoje', ic:'ti-circle-check', cls:'ok'},
-    {n:recebidasMes, l:'recebidas no mês', ic:'ti-calendar-month', cls:''},
+    {n:pend.length, l:'pendentes', ic:'ti-clock-hour-4', cls:'', f:'pendentes'},
+    {n:faltaAvisar, l:'falta avisar', ic:'ti-bell', cls:'alerta', f:'falta_avisar'},
+    {n:avisadas, l:'avisadas aguardando', ic:'ti-bell-ringing', cls:'info', f:'avisado'},
+    {n:atrasadas, l:'atrasadas (+7 dias)', ic:'ti-alert-triangle', cls:'alerta', f:'atrasadas'},
+    {n:recebidasHoje, l:'recebidas hoje', ic:'ti-inbox', cls:'info', f:'recebidas_hoje'},
+    {n:retiradasHoje, l:'retiradas hoje', ic:'ti-circle-check', cls:'ok', f:'retiradas_hoje'},
+    {n:recebidasMes, l:'recebidas no mês', ic:'ti-calendar-month', cls:'', f:'recebidas_mes'},
   ];
   document.getElementById('inicio-metrics').innerHTML = cards.map(c=>`
-    <div class="metric ${c.cls}">
+    <div class="metric ${c.cls}" role="button" tabindex="0" onclick="abrirEncomendasFiltrado('${c.f}')">
       <div class="n">${c.n}</div>
-      <div class="l"><i class="ti ${c.ic}"></i>${c.l}</div>
+      <div class="l"><i class="ti ${c.ic}"></i>${c.l}<i class="ti ti-chevron-right" style="margin-left:auto;opacity:.35"></i></div>
     </div>`).join('');
 }
 
@@ -969,16 +981,45 @@ function diasEspera(iso){
 }
 
 // ---------- ENCOMENDAS ----------
+// rótulos amigáveis de cada filtro (usados no contador e no banner)
+const FILTROS_LABEL = {
+  pendentes:'Pendentes', retiradas:'Retiradas', todas:'Todas',
+  falta_avisar:'Falta avisar', avisado:'Avisado aguardando',
+  recebidas_hoje:'Recebidas hoje', atrasadas:'Atrasadas (+7 dias)',
+  retiradas_hoje:'Retiradas hoje', recebidas_mes:'Recebidas no mês'
+};
+function sincronizarBotoesFiltro(){
+  document.querySelectorAll('.filtro button').forEach(b=>b.classList.toggle('on', b.dataset.f===filtroAtual));
+}
 function setFiltro(f){
   filtroAtual = f;
-  document.querySelectorAll('.filtro button').forEach(b=>b.classList.toggle('on', b.dataset.f===f));
+  sincronizarBotoesFiltro();
   renderEncomendas();
+}
+// abre a aba Encomendas já com um filtro aplicado (usado pelos cards do Início)
+function abrirEncomendasFiltrado(f){
+  filtroAtual = f;
+  const busca = document.getElementById('enc-busca'); if(busca) busca.value='';
+  trocarAba('encomendas');       // recarrega e chama renderEncomendas usando filtroAtual
+  sincronizarBotoesFiltro();
 }
 function renderEncomendas(){
   const box = document.getElementById('lista-encomendas');
   let itens = ENCOMENDAS;
-  if(filtroAtual==='pendentes') itens = ENCOMENDAS.filter(e=>e.status!=='retirada');
-  if(filtroAtual==='retiradas') itens = ENCOMENDAS.filter(e=>e.status==='retirada');
+  const _hoje = new Date(); _hoje.setHours(0,0,0,0);
+  const _inicioMes = new Date(_hoje.getFullYear(), _hoje.getMonth(), 1).getTime();
+  const _ehHoje = (iso)=> iso && new Date(iso).getTime() >= _hoje.getTime();
+  switch(filtroAtual){
+    case 'pendentes':      itens = ENCOMENDAS.filter(e=>e.status!=='retirada'); break;
+    case 'retiradas':      itens = ENCOMENDAS.filter(e=>e.status==='retirada'); break;
+    case 'falta_avisar':   itens = ENCOMENDAS.filter(e=>e.status==='recebida'); break;
+    case 'avisado':        itens = ENCOMENDAS.filter(e=>e.status==='notificada'); break;
+    case 'recebidas_hoje': itens = ENCOMENDAS.filter(e=>_ehHoje(e.recebida_em)); break;
+    case 'atrasadas':      itens = ENCOMENDAS.filter(e=>e.status!=='retirada' && diasEspera(e.recebida_em)>=7); break;
+    case 'retiradas_hoje': itens = ENCOMENDAS.filter(e=>e.status==='retirada' && _ehHoje(e.retirada_em)); break;
+    case 'recebidas_mes':  itens = ENCOMENDAS.filter(e=>e.recebida_em && new Date(e.recebida_em).getTime()>=_inicioMes); break;
+    default:               itens = ENCOMENDAS; // 'todas'
+  }
 
   // busca por nome, apartamento, bloco ou código
   const q = normalizar(document.getElementById('enc-busca')?.value);
@@ -992,10 +1033,19 @@ function renderEncomendas(){
     });
   }
 
+  // banner do filtro ativo (aparece quando o filtro não tem botão visível — ex.: vindo de um card do Início)
+  const _bar = document.getElementById('enc-filtro-ativo');
+  if(_bar){
+    const temBotao = ['pendentes','retiradas','todas','falta_avisar','avisado'].includes(filtroAtual);
+    if(!temBotao){
+      _bar.innerHTML = '<div class="filtro-ativo"><i class="ti ti-filter"></i> Filtrando: <b>'+(FILTROS_LABEL[filtroAtual]||filtroAtual)+'</b><button class="linkbtn" onclick="setFiltro(\'pendentes\')">✕ limpar</button></div>';
+      _bar.style.display = '';
+    } else { _bar.innerHTML=''; _bar.style.display='none'; }
+  }
   const cnt = document.getElementById('enc-count');
   if(cnt){
-    const rotulo = filtroAtual==='retiradas' ? 'retirada(s)' : (filtroAtual==='pendentes' ? 'pendente(s)' : 'no total');
-    cnt.textContent = itens.length + ' encomenda(s) ' + rotulo + (q?' para "'+document.getElementById('enc-busca').value.trim()+'"':'');
+    const lbl = (FILTROS_LABEL[filtroAtual]||'').toLowerCase();
+    cnt.textContent = itens.length + ' encomenda(s)' + (lbl?' · '+lbl:'') + (q?' · "'+document.getElementById('enc-busca').value.trim()+'"':'');
   }
 
   if(itens.length===0){ box.innerHTML = '<div class="vazio">Nenhuma encomenda aqui.</div>'; return; }
