@@ -174,6 +174,7 @@
   <button data-aba="inicio" class="ativo" onclick="trocarAba('inicio')"><i class="ti ti-home"></i>Início</button>
   <button data-aba="receber" onclick="trocarAba('receber')"><i class="ti ti-camera-plus"></i>Receber</button>
   <button data-aba="encomendas" onclick="trocarAba('encomendas')"><i class="ti ti-package"></i>Encomendas</button>
+  <button data-aba="disparo" onclick="trocarAba('disparo')"><i class="ti ti-brand-whatsapp"></i>Disparo</button>
   <button data-aba="moradores" onclick="trocarAba('moradores')"><i class="ti ti-users"></i>Moradores</button>
   <button data-aba="relatorios" onclick="trocarAba('relatorios')"><i class="ti ti-chart-bar"></i>Relatórios</button>
 </nav>
@@ -331,6 +332,61 @@
     </div>
     <div id="rel-resultado"></div>
   </section>
+
+  <!-- ABA DISPARO (WhatsApp em lote via Evolution API) -->
+  <section id="aba-disparo" style="display:none">
+    <div class="card" style="border:1.5px dashed var(--verde);background:var(--verde-bg)">
+      <strong style="display:flex;align-items:center;gap:7px"><i class="ti ti-brand-whatsapp" style="color:var(--verde);font-size:20px"></i> Disparo no WhatsApp</strong>
+      <p class="meta" style="margin:6px 0 0">Avisa de uma vez todos os moradores com encomenda que ainda não foram notificados. O envio usa intervalos aleatórios e "digitando…" para evitar bloqueio. <b>Deixe esta tela aberta</b> durante o disparo.</p>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong style="display:flex;align-items:center;gap:7px"><i class="ti ti-adjustments-alt" style="color:var(--azul)"></i> Ajustes do envio</strong>
+        <button class="linkbtn" onclick="toggleDispConfig()">mostrar/ocultar</button>
+      </div>
+      <div id="disp-config" style="display:none">
+        <div class="row2">
+          <div><label>Intervalo mínimo (seg)</label><input id="disp-min" type="number" inputmode="numeric" value="8"></div>
+          <div><label>Intervalo máximo (seg)</label><input id="disp-max" type="number" inputmode="numeric" value="20"></div>
+        </div>
+        <div class="row2">
+          <div><label>Pausa a cada (msgs)</label><input id="disp-lote" type="number" inputmode="numeric" value="10"></div>
+          <div><label>Pausa longa (seg)</label><input id="disp-pausa" type="number" inputmode="numeric" value="90"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;color:var(--texto);margin-top:10px">
+          <input type="checkbox" id="disp-horario" checked style="width:auto"> Avisar só em horário comercial (8h–20h)
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="disp-resumo" class="meta" style="font-weight:700">—</div>
+      <div id="disp-lista" style="max-height:260px;overflow:auto;margin-top:8px"></div>
+      <button class="acao verde" id="disp-botao" onclick="dispararLote()"><i class="ti ti-send"></i> Disparar avisos pendentes</button>
+      <button class="acao sec" id="disp-parar" onclick="pararDisparo()" style="display:none"><i class="ti ti-player-stop"></i> Parar disparo</button>
+    </div>
+
+    <div class="card" id="disp-progresso-card" style="display:none">
+      <strong style="display:flex;align-items:center;gap:7px"><i class="ti ti-activity" style="color:var(--verde)"></i> Progresso</strong>
+      <div style="margin:10px 0">
+        <div style="height:10px;background:var(--borda);border-radius:999px;overflow:hidden">
+          <div id="disp-barra" style="height:100%;width:0;background:var(--verde);transition:width .3s"></div>
+        </div>
+        <div id="disp-status" class="meta" style="margin-top:6px;font-weight:600"></div>
+      </div>
+      <div id="disp-log" style="max-height:240px;overflow:auto;font-size:13px"></div>
+    </div>
+
+    <div class="card">
+      <strong style="display:flex;align-items:center;gap:7px"><i class="ti ti-message-2-check" style="color:var(--azul)"></i> Enviar teste</strong>
+      <p class="meta" style="margin:6px 0">Mande uma mensagem de teste pra um número seu antes de disparar pra todos.</p>
+      <label>Número (com DDD)</label>
+      <input id="disp-teste-num" inputmode="tel" placeholder="Ex.: 11 91234-5678">
+      <button class="acao sec" onclick="enviarTeste()"><i class="ti ti-send"></i> Enviar teste</button>
+      <div id="disp-teste-status" class="meta" style="margin-top:8px"></div>
+    </div>
+  </section>
 </main>
 
 <input type="file" id="baixa-manual-foto" accept="image/*" capture="environment" style="display:none" onchange="baixaManualComFoto(event)">
@@ -470,11 +526,13 @@ function trocarAba(aba){
   document.getElementById('aba-inicio').style.display    = aba==='inicio' ? '' : 'none';
   document.getElementById('aba-receber').style.display   = aba==='receber' ? '' : 'none';
   document.getElementById('aba-encomendas').style.display= aba==='encomendas' ? '' : 'none';
+  document.getElementById('aba-disparo').style.display   = aba==='disparo' ? '' : 'none';
   document.getElementById('aba-moradores').style.display = aba==='moradores' ? '' : 'none';
   document.getElementById('aba-relatorios').style.display= aba==='relatorios' ? '' : 'none';
   window.scrollTo({top:0, behavior:'smooth'});
   if(aba==='inicio') renderInicio();
   if(aba==='encomendas') carregarEncomendas();
+  if(aba==='disparo') renderDisparo();
   if(aba==='moradores') renderMoradores();
   if(aba==='relatorios') prepararRelatorio();
 }
@@ -1140,6 +1198,161 @@ async function marcarNotificado(e, m){
     sucesso(); toast('✅ WhatsApp aberto — é só apertar enviar', '#1a9c53');
     carregarEncomendas();
   }catch(err){ console.error(err); }
+}
+
+// ========== DISPARO EM LOTE (WhatsApp automático via Evolution API) ==========
+let DISPARANDO = false;
+let PARAR_DISPARO = false;
+const dormir = (ms)=> new Promise(r=>setTimeout(r, ms));
+const aleatorio = (min,max)=> Math.floor(min + Math.random()*(max-min));
+
+function toggleDispConfig(){
+  const c = document.getElementById('disp-config');
+  c.style.display = c.style.display==='none' ? '' : 'none';
+}
+
+// encomendas que ainda faltam avisar (status recebida), com o telefone já resolvido
+function encomendasParaAvisar(){
+  return ENCOMENDAS.filter(e=>e.status==='recebida').map(e=>{
+    const m = MORADORES.find(x=>x.id===e.morador_id) || {};
+    return { e, m, fone: telefoneParaWa(m.telefone) };
+  });
+}
+
+function renderDisparo(){
+  const alvo = encomendasParaAvisar();
+  const comFone = alvo.filter(x=>x.fone);
+  const semFone = alvo.filter(x=>!x.fone);
+  const resumo = document.getElementById('disp-resumo');
+  if(resumo){
+    resumo.innerHTML = `${comFone.length} para enviar` +
+      (semFone.length?` · <span style="color:var(--vermelho)">${semFone.length} sem telefone (serão pulados)</span>`:'');
+  }
+  const lista = document.getElementById('disp-lista');
+  if(lista){
+    if(alvo.length===0){ lista.innerHTML = '<div class="vazio">Ninguém para avisar agora. 🎉</div>'; }
+    else lista.innerHTML = alvo.map(({e,m,fone})=>`
+      <div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--borda)">
+        <div><b>Apto ${escapeH(m.apartamento||'?')}${m.bloco?' Bl '+escapeH(m.bloco):''}</b> — ${escapeH(m.nome||'')}<div class="meta">Código ${escapeH(e.codigo_retirada)}</div></div>
+        <div class="meta" style="text-align:right;white-space:nowrap">${fone?'📱 ok':'<span style="color:var(--vermelho)">sem telefone</span>'}</div>
+      </div>`).join('');
+  }
+  const botao = document.getElementById('disp-botao');
+  if(botao) botao.disabled = (comFone.length===0 || DISPARANDO);
+}
+
+// pequenas variações no texto pra reduzir risco de bloqueio
+function montarMensagemAviso(m, e){
+  const apto = (m.apartamento||'') + (m.bloco?' Bl '+m.bloco:'');
+  const saud  = ['Olá','Oi','Olá,'][aleatorio(0,3)];
+  const emoji = ['📦','📦','🛒'][aleatorio(0,3)];
+  const fecho = ['Obrigado!','Obrigada!','Att., Portaria'][aleatorio(0,3)];
+  return `${saud} ${m.nome||''}! ${emoji}\n\n`+
+    `Chegou uma encomenda para o apartamento *${apto}* na portaria do Spazio Montero.\n\n`+
+    `Código de retirada: *${e.codigo_retirada}*\n`+
+    (e.transportadora?`Transportadora: ${e.transportadora}\n`:'')+
+    `\nÉ só retirar na portaria apresentando o código. ${fecho}\n— Portaria Spazio Montero`;
+}
+
+function dentroHorarioComercial(){
+  const h = new Date().getHours();
+  return h>=8 && h<20;
+}
+
+// chama a Edge Function e envia UMA mensagem; devolve {ok} ou {ok:false, erro}
+async function enviarUm(fone, texto){
+  const delay = aleatorio(900, 2500); // "digitando…" antes de enviar
+  const {data, error} = await db.functions.invoke('disparar-whatsapp', { body:{ numero:fone, texto, delay } });
+  if(error){
+    let msg = error.message || 'falha ao chamar a função';
+    try{ const b = await error.context.json(); if(b && b.erro) msg = b.erro; }catch(e){}
+    return { ok:false, erro: msg };
+  }
+  if(data && data.ok) return { ok:true };
+  return { ok:false, erro: (data && (data.erro || ('HTTP '+(data.statusHttp||'?')))) || 'a Evolution não confirmou o envio' };
+}
+
+async function enviarTeste(){
+  const fone = telefoneParaWa(document.getElementById('disp-teste-num').value);
+  const st = document.getElementById('disp-teste-status');
+  if(!fone){ st.innerHTML = '<span style="color:var(--vermelho)">Número inválido.</span>'; return; }
+  st.textContent = 'Enviando teste…';
+  const texto = `Teste da Central de Encomendas ✅\nSe você recebeu isto, o disparo está funcionando.\n— Portaria Spazio Montero`;
+  const r = await enviarUm(fone, texto);
+  if(r.ok){ sucesso(); st.innerHTML = '<span style="color:var(--verde-tx)">✅ Enviado! Confira o WhatsApp.</span>'; }
+  else st.innerHTML = '<span style="color:var(--vermelho)">❌ '+escapeH(r.erro)+'</span>';
+}
+
+function pararDisparo(){ PARAR_DISPARO = true; }
+
+function addLog(box, txt, cor){
+  const d = document.createElement('div');
+  d.style.padding='4px 0'; d.style.color=cor||'var(--texto)'; d.textContent=txt;
+  box.appendChild(d); box.scrollTop = box.scrollHeight;
+}
+
+async function dispararLote(){
+  if(DISPARANDO) return;
+  const alvo = encomendasParaAvisar().filter(x=>x.fone);
+  if(alvo.length===0){ toast('Ninguém para avisar', '#d23c3c'); return; }
+
+  if(document.getElementById('disp-horario').checked && !dentroHorarioComercial()){
+    if(!confirm('Fora do horário comercial (8h–20h). Enviar mesmo assim?')) return;
+  }
+  if(!confirm(`Disparar aviso para ${alvo.length} morador(es) agora?`)) return;
+
+  const min  = Math.max(2, parseInt(document.getElementById('disp-min').value)||8)*1000;
+  const max  = Math.max(min/1000+1, parseInt(document.getElementById('disp-max').value)||20)*1000;
+  const lote = Math.max(1, parseInt(document.getElementById('disp-lote').value)||10);
+  const pausa= Math.max(5, parseInt(document.getElementById('disp-pausa').value)||90)*1000;
+
+  DISPARANDO = true; PARAR_DISPARO = false;
+  document.getElementById('disp-botao').style.display='none';
+  document.getElementById('disp-parar').style.display='';
+  document.getElementById('disp-progresso-card').style.display='';
+  const barra = document.getElementById('disp-barra');
+  const status = document.getElementById('disp-status');
+  const log = document.getElementById('disp-log');
+  log.innerHTML=''; barra.style.width='0';
+
+  let enviados=0, falhas=0;
+  for(let i=0;i<alvo.length;i++){
+    if(PARAR_DISPARO){ addLog(log, '⏹️ Parado pela portaria.', 'var(--suave)'); break; }
+    const {e,m,fone} = alvo[i];
+    status.textContent = `Enviando ${i+1} de ${alvo.length}…`;
+    const r = await enviarUm(fone, montarMensagemAviso(m, e));
+    if(r.ok){
+      enviados++;
+      try{ await marcarNotificadoBanco(e, m); }catch(err){ console.error(err); }
+      addLog(log, `✅ Apto ${m.apartamento||'?'}${m.bloco?' Bl '+m.bloco:''} — ${m.nome||''}`, 'var(--verde-tx)');
+    } else {
+      falhas++;
+      addLog(log, `❌ Apto ${m.apartamento||'?'} — ${m.nome||''}: ${r.erro}`, 'var(--vermelho)');
+    }
+    barra.style.width = Math.round(((i+1)/alvo.length)*100)+'%';
+    if(i < alvo.length-1 && !PARAR_DISPARO){
+      let ms = aleatorio(min, max);
+      if((i+1)%lote===0){ ms += pausa; addLog(log, `⏸️ Pausa de lote (~${Math.round(ms/1000)}s)…`, 'var(--suave)'); }
+      await dormir(ms);
+    }
+  }
+  status.textContent = `Concluído: ${enviados} enviado(s), ${falhas} falha(s).`;
+  if(enviados) sucesso();
+  DISPARANDO = false;
+  document.getElementById('disp-parar').style.display='none';
+  document.getElementById('disp-botao').style.display='';
+  await carregarEncomendas();
+  renderDisparo();
+}
+
+// grava status "notificada" + registra em notificacoes (sem abrir wa.me)
+async function marcarNotificadoBanco(e, m){
+  await db.from('encomendas').update({status:'notificada'}).eq('id', e.id).eq('status','recebida');
+  const alvo = ENCOMENDAS.find(y=>y.id===e.id); if(alvo) alvo.status='notificada';
+  await db.from('notificacoes').insert({
+    encomenda_id: e.id, morador_id: m.id||null, canal:'whatsapp',
+    telefone_destino: m.telefone||null, status_envio:'enviada', enviada_em: new Date().toISOString()
+  });
 }
 
 // Baixa manual: agora exige a foto do cupom assinado (abre a câmera)
