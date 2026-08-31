@@ -198,7 +198,8 @@
     <div class="card" style="border:1.5px dashed var(--azul);background:var(--azul-bg)">
       <strong style="display:flex;align-items:center;gap:7px"><i class="ti ti-camera-plus" style="color:var(--azul);font-size:20px"></i> Ler etiqueta por foto</strong>
       <p class="meta" style="margin:6px 0 10px">Tire uma foto do rótulo. A IA lê e preenche os dados sozinha. Confira sempre antes de salvar.</p>
-      <input type="file" id="r-foto" accept="image/*" capture="environment" onchange="lerEtiqueta(event)">
+      <button type="button" class="acao" style="margin-top:4px" onclick="document.getElementById('r-foto').click()"><i class="ti ti-camera-plus"></i> Tirar foto da etiqueta</button>
+      <input type="file" id="r-foto" accept="image/*" capture="environment" onchange="lerEtiqueta(event)" style="display:none">
       <div id="ocr-status" style="margin-top:10px"></div>
       <img id="ocr-preview" style="display:none;max-width:100%;border-radius:8px;margin-top:10px;border:1px solid var(--borda)">
     </div>
@@ -239,7 +240,8 @@
       <p class="meta" style="margin:6px 0 10px">Escaneie o QR do cupom assinado. A câmera lê na hora, dá baixa e guarda a foto como comprovante.</p>
       <button class="acao verde" onclick="abrirScanner()"><i class="ti ti-scan"></i> Escanear QR (câmera)</button>
       <div class="meta" style="text-align:center;margin:8px 0 4px">ou, se preferir, tire uma foto do cupom:</div>
-      <input type="file" id="b-foto" accept="image/*" capture="environment" onchange="lerBaixaFoto(event)">
+      <button type="button" class="acao sec" onclick="document.getElementById('b-foto').click()"><i class="ti ti-camera"></i> Tirar foto do cupom</button>
+      <input type="file" id="b-foto" accept="image/*" capture="environment" onchange="lerBaixaFoto(event)" style="display:none">
       <div id="baixa-status" style="margin-top:10px"></div>
     </div>
 
@@ -361,6 +363,10 @@
     </div>
 
     <div class="card">
+      <div class="filtro" id="disp-modo">
+        <button data-dm="novos" class="on" onclick="setDispMode('novos')"><i class="ti ti-bell"></i> Faltam avisar</button>
+        <button data-dm="reaviso" onclick="setDispMode('reaviso')"><i class="ti ti-clock-exclamation"></i> Reaviso +7 dias</button>
+      </div>
       <div id="disp-resumo" class="meta" style="font-weight:700">—</div>
       <div id="disp-lista" style="max-height:260px;overflow:auto;margin-top:8px"></div>
       <button class="acao verde" id="disp-botao" onclick="dispararLote()"><i class="ti ti-send"></i> Disparar avisos pendentes</button>
@@ -736,7 +742,7 @@ function blobParaBase64(blob){
 // pede pro Gemini (via Edge Function) ler o rótulo; devolve {dados} ou {erro}
 async function lerEtiquetaIA(file){
   try{
-    const menor = await reduzirImagem(file, 1400, 0.82); // nítida o bastante pra ler o nome pequeno, ainda leve
+    const menor = await reduzirImagem(file, 1100, 0.75); // menor = upload e leitura mais rápidos (equilíbrio com a precisão)
     const b64 = await blobParaBase64(menor);
     const {data, error} = await db.functions.invoke('ler-etiqueta', { body:{ imagemBase64:b64, mime:'image/jpeg' } });
     if(error){
@@ -784,6 +790,9 @@ function marcarEscolhaOCR(btn){
 async function lerEtiqueta(ev){
   const file = ev.target.files[0];
   if(!file) return;
+  // limpa o cupom da encomenda ANTERIOR pra não confundir com a que está entrando
+  const reciboAnt = document.getElementById('r-recibo'); if(reciboAnt) reciboAnt.innerHTML='';
+  ULTIMO_RECIBO = null;
   FOTO_SELECIONADA = file;
   const prev = document.getElementById('ocr-preview');
   prev.src = URL.createObjectURL(file); prev.style.display='';
@@ -1047,7 +1056,7 @@ const FILTROS_LABEL = {
   retiradas_hoje:'Retiradas hoje', recebidas_mes:'Recebidas no mês'
 };
 function sincronizarBotoesFiltro(){
-  document.querySelectorAll('.filtro button').forEach(b=>b.classList.toggle('on', b.dataset.f===filtroAtual));
+  document.querySelectorAll('#aba-encomendas .filtro button').forEach(b=>b.classList.toggle('on', b.dataset.f===filtroAtual));
 }
 function setFiltro(f){
   filtroAtual = f;
@@ -1211,6 +1220,14 @@ function toggleDispConfig(){
   c.style.display = c.style.display==='none' ? '' : 'none';
 }
 
+// modo do disparo: 'novos' (faltam avisar) ou 'reaviso' (paradas +7 dias)
+let dispMode = 'novos';
+function setDispMode(m){
+  dispMode = m;
+  document.querySelectorAll('#aba-disparo .filtro button').forEach(b=>b.classList.toggle('on', b.dataset.dm===m));
+  renderDisparo();
+}
+
 // encomendas que ainda faltam avisar (status recebida), com o telefone já resolvido
 function encomendasParaAvisar(){
   return ENCOMENDAS.filter(e=>e.status==='recebida').map(e=>{
@@ -1219,26 +1236,45 @@ function encomendasParaAvisar(){
   });
 }
 
+// encomendas AINDA pendentes (não retiradas) paradas há 7 dias ou mais — para reaviso
+function encomendasParaReaviso(){
+  return ENCOMENDAS.filter(e=>e.status!=='retirada' && diasEspera(e.recebida_em)>=7).map(e=>{
+    const m = MORADORES.find(x=>x.id===e.morador_id) || {};
+    return { e, m, fone: telefoneParaWa(m.telefone) };
+  });
+}
+
+// lista alvo conforme o modo escolhido
+function alvoDisparoAtual(){
+  return dispMode==='reaviso' ? encomendasParaReaviso() : encomendasParaAvisar();
+}
+
 function renderDisparo(){
-  const alvo = encomendasParaAvisar();
+  const alvo = alvoDisparoAtual();
   const comFone = alvo.filter(x=>x.fone);
   const semFone = alvo.filter(x=>!x.fone);
+  const ehReaviso = dispMode==='reaviso';
   const resumo = document.getElementById('disp-resumo');
   if(resumo){
-    resumo.innerHTML = `${comFone.length} para enviar` +
+    resumo.innerHTML = `${comFone.length} para ${ehReaviso?'reavisar':'enviar'}` +
       (semFone.length?` · <span style="color:var(--vermelho)">${semFone.length} sem telefone (serão pulados)</span>`:'');
   }
   const lista = document.getElementById('disp-lista');
   if(lista){
-    if(alvo.length===0){ lista.innerHTML = '<div class="vazio">Ninguém para avisar agora. 🎉</div>'; }
-    else lista.innerHTML = alvo.map(({e,m,fone})=>`
+    if(alvo.length===0){ lista.innerHTML = '<div class="vazio">'+(ehReaviso?'Nenhuma encomenda parada há +7 dias. 🎉':'Ninguém para avisar agora. 🎉')+'</div>'; }
+    else lista.innerHTML = alvo.map(({e,m,fone})=>{
+      const dias = diasEspera(e.recebida_em);
+      return `
       <div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--borda)">
-        <div><b>Apto ${escapeH(m.apartamento||'?')}${m.bloco?' Bl '+escapeH(m.bloco):''}</b> — ${escapeH(m.nome||'')}<div class="meta">Código ${escapeH(e.codigo_retirada)}</div></div>
+        <div><b>Apto ${escapeH(m.apartamento||'?')}${m.bloco?' Bl '+escapeH(m.bloco):''}</b> — ${escapeH(m.nome||'')}<div class="meta">Código ${escapeH(e.codigo_retirada)}${ehReaviso?' · '+dias+' dias parada':''}</div></div>
         <div class="meta" style="text-align:right;white-space:nowrap">${fone?'📱 ok':'<span style="color:var(--vermelho)">sem telefone</span>'}</div>
-      </div>`).join('');
+      </div>`;}).join('');
   }
   const botao = document.getElementById('disp-botao');
-  if(botao) botao.disabled = (comFone.length===0 || DISPARANDO);
+  if(botao){
+    botao.disabled = (comFone.length===0 || DISPARANDO);
+    botao.innerHTML = '<i class="ti ti-send"></i> '+(ehReaviso?'Disparar reavisos (+7 dias)':'Disparar avisos pendentes');
+  }
 }
 
 // pequenas variações no texto pra reduzir risco de bloqueio
@@ -1252,6 +1288,20 @@ function montarMensagemAviso(m, e){
     `Código de retirada: *${e.codigo_retirada}*\n`+
     (e.transportadora?`Transportadora: ${e.transportadora}\n`:'')+
     `\nÉ só retirar na portaria apresentando o código. ${fecho}\n— Portaria Spazio Montero`;
+}
+
+// mensagem de reaviso para encomendas paradas há +7 dias
+function montarMensagemReaviso(m, e){
+  const apto = (m.apartamento||'') + (m.bloco?' Bl '+m.bloco:'');
+  const dias = diasEspera(e.recebida_em);
+  const saud  = ['Olá','Oi','Olá,'][aleatorio(0,3)];
+  const emoji = ['📦','⏰','📦'][aleatorio(0,3)];
+  return `${saud} ${m.nome||''}! ${emoji}\n\n`+
+    `Passando pra lembrar: a encomenda do apartamento *${apto}* continua aguardando retirada na portaria do Spazio Montero`+
+    (dias?` há *${dias} dias*`:'')+`.\n\n`+
+    `Código de retirada: *${e.codigo_retirada}*\n`+
+    (e.transportadora?`Transportadora: ${e.transportadora}\n`:'')+
+    `\nQuando puder, é só retirar apresentando o código. Obrigado!\n— Portaria Spazio Montero`;
 }
 
 function dentroHorarioComercial(){
@@ -1293,13 +1343,14 @@ function addLog(box, txt, cor){
 
 async function dispararLote(){
   if(DISPARANDO) return;
-  const alvo = encomendasParaAvisar().filter(x=>x.fone);
-  if(alvo.length===0){ toast('Ninguém para avisar', '#d23c3c'); return; }
+  const ehReaviso = dispMode==='reaviso';
+  const alvo = alvoDisparoAtual().filter(x=>x.fone);
+  if(alvo.length===0){ toast(ehReaviso?'Nenhuma parada há +7 dias':'Ninguém para avisar', '#d23c3c'); return; }
 
   if(document.getElementById('disp-horario').checked && !dentroHorarioComercial()){
     if(!confirm('Fora do horário comercial (8h–20h). Enviar mesmo assim?')) return;
   }
-  if(!confirm(`Disparar aviso para ${alvo.length} morador(es) agora?`)) return;
+  if(!confirm(`Disparar ${ehReaviso?'REAVISO':'aviso'} para ${alvo.length} morador(es) agora?`)) return;
 
   const min  = Math.max(2, parseInt(document.getElementById('disp-min').value)||8)*1000;
   const max  = Math.max(min/1000+1, parseInt(document.getElementById('disp-max').value)||20)*1000;
@@ -1320,7 +1371,8 @@ async function dispararLote(){
     if(PARAR_DISPARO){ addLog(log, '⏹️ Parado pela portaria.', 'var(--suave)'); break; }
     const {e,m,fone} = alvo[i];
     status.textContent = `Enviando ${i+1} de ${alvo.length}…`;
-    const r = await enviarUm(fone, montarMensagemAviso(m, e));
+    const texto = ehReaviso ? montarMensagemReaviso(m, e) : montarMensagemAviso(m, e);
+    const r = await enviarUm(fone, texto);
     if(r.ok){
       enviados++;
       try{ await marcarNotificadoBanco(e, m); }catch(err){ console.error(err); }
