@@ -715,7 +715,7 @@ let FOTO_SELECIONADA = null; // arquivo da foto pra subir ao salvar
 
 // envia um arquivo pro Storage (reduzido, p/ durar mais) e devolve o CAMINHO
 async function uploadArquivo(file, prefixo){
-  const menor = await reduzirImagem(file, 1000);  // reduz antes de guardar
+  const menor = await reduzirImagem(file, 800, 0.8);  // reduz antes de guardar (menor = upload mais rápido)
   const nome = prefixo+'/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.jpg';
   const {error} = await db.storage.from('comprovantes').upload(nome, menor, {upsert:false, contentType:'image/jpeg'});
   if(error) throw error;
@@ -856,14 +856,10 @@ async function salvarEncomenda(){
   if(!morador_id){ toast('Escolha o morador', '#d23c3c'); return; }
 
   const codigo = gerarCodigo();
+  const fotoParaSubir = FOTO_SELECIONADA; // guarda antes de limpar o formulário
   let data, error;
   await comCarregando('Salvando encomenda…', async ()=>{
-    // sobe a foto (se houver)
-    let foto_url = null;
-    if(FOTO_SELECIONADA){
-      try{ foto_url = await uploadArquivo(FOTO_SELECIONADA, 'recebimento'); }
-      catch(err){ console.error(err); toast('Não consegui enviar a foto — encomenda salva sem ela', '#d23c3c'); }
-    }
+    // salva o registro JÁ (não espera a foto subir) — porteira libera o cupom na hora
     const registro = {
       morador_id,
       transportadora: transportadora || null,
@@ -871,7 +867,7 @@ async function salvarEncomenda(){
       codigo_retirada: codigo,
       peso: pesoRaw ? parseFloat(pesoRaw) : null,
       observacoes: obs || null,
-      foto_url: foto_url,
+      foto_url: null,
       porteiro_recebeu: null,
       status: 'recebida'
     };
@@ -880,6 +876,9 @@ async function salvarEncomenda(){
   });
   if(error){ toast('Erro ao salvar: '+error.message, '#d23c3c'); console.error(error); return; }
   sucesso();
+
+  // sobe a foto em segundo plano (não bloqueia o recibo/impressão)
+  if(fotoParaSubir && data && data.id){ subirFotoRecebimentoEmSegundoPlano(fotoParaSubir, data.id); }
 
   const m = MORADORES.find(x=>x.id===morador_id) || {};
   mostrarRecibo(m, data);
@@ -898,6 +897,19 @@ async function salvarEncomenda(){
   document.getElementById('ocr-preview').style.display='none';
   FOTO_SELECIONADA = null;
   toast('Encomenda registrada! Código '+codigo, '#1a9c53');
+}
+
+// sobe a foto do recebimento sem travar a tela (o cupom já foi liberado pra impressão)
+async function subirFotoRecebimentoEmSegundoPlano(file, encomendaId){
+  try{
+    const foto_url = await uploadArquivo(file, 'recebimento');
+    await db.from('encomendas').update({foto_url}).eq('id', encomendaId);
+    const alvo = ENCOMENDAS.find(x=>x.id===encomendaId); if(alvo) alvo.foto_url = foto_url;
+    if(ULTIMO_RECIBO && ULTIMO_RECIBO.e && ULTIMO_RECIBO.e.id===encomendaId) ULTIMO_RECIBO.e.foto_url = foto_url;
+  }catch(err){
+    console.error(err);
+    toast('Não consegui enviar a foto do rótulo — encomenda salva sem ela', '#d23c3c');
+  }
 }
 
 let ULTIMO_RECIBO = null;
