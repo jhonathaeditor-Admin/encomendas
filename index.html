@@ -621,7 +621,7 @@ function limparMoradorPicker(){
 }
 
 // ---------- CHIPS DE TRANSPORTADORA ----------
-const TRANSPORTADORAS = ['Correios','Mercado Livre','Shopee','Amazon','Shein','AliExpress','Jadlog','Loggi','Total Express'];
+const TRANSPORTADORAS = ['Correios','Mercado Livre','Shopee','Amazon','Shein','AliExpress','TikTok Shop','Jadlog','Loggi','Total Express'];
 function montarChipsTransp(){
   const box = document.getElementById('transp-chips'); if(!box) return;
   box.innerHTML = TRANSPORTADORAS.map(t=>`<button type="button" class="chip" onclick="selecionarTransp('${t}', this)">${t}</button>`).join('')
@@ -1678,6 +1678,37 @@ async function salvarMorador(){
   document.getElementById('m-telefone').value='';
   carregarMoradores();
 }
+// ---------- EDITAR MORADOR (Gestão) ----------
+let EDITANDO_MORADOR_ID = null;
+function abrirEdicaoMorador(id){
+  EDITANDO_MORADOR_ID = id;
+  renderMoradores();
+  // rola até o card em edição
+  setTimeout(()=>{
+    const el = document.getElementById('edicao-morador-'+id);
+    if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+  }, 60);
+}
+function cancelarEdicaoMorador(){
+  EDITANDO_MORADOR_ID = null;
+  renderMoradores();
+}
+async function salvarEdicaoMorador(id){
+  const apto = document.getElementById('em-apto-'+id).value.trim();
+  const bloco = document.getElementById('em-bloco-'+id).value.trim();
+  const nome = document.getElementById('em-nome-'+id).value.trim();
+  const tel = document.getElementById('em-telefone-'+id).value.trim();
+  if(!apto || !nome){ toast('Preencha apartamento e nome', '#d23c3c'); return; }
+
+  const {error} = await db.from('moradores').update({
+    nome, apartamento: apto, bloco: bloco||null, telefone: tel||null,
+    nome_normalizado: normalizar(nome)
+  }).eq('id', id);
+  if(error){ toast('Erro ao salvar: '+error.message, '#d23c3c'); console.error(error); return; }
+  toast('Morador atualizado!', '#1a9c53');
+  EDITANDO_MORADOR_ID = null;
+  await carregarMoradores();
+}
 function renderMoradores(){
   const box = document.getElementById('lista-moradores');
   const q = normalizar(document.getElementById('m-busca')?.value);
@@ -1689,7 +1720,25 @@ function renderMoradores(){
   const limite = 80;
   const mostrando = itens.slice(0, limite);
   const aviso = total>limite ? `<div class="meta" style="padding:8px 2px">Mostrando ${limite} de ${total}. Use a busca acima para achar um morador específico.</div>` : `<div class="meta" style="padding:8px 2px">${total} morador(es)</div>`;
-  box.innerHTML = aviso + mostrando.map(m=>`
+  box.innerHTML = aviso + mostrando.map(m=>{
+    const emEdicao = PAPEL==='gestao' && EDITANDO_MORADOR_ID===m.id;
+    if(emEdicao){
+      return `
+    <div class="lista-item" id="edicao-morador-${m.id}" style="border-left-color:var(--azul)">
+      <strong style="display:flex;align-items:center;gap:7px;margin-bottom:8px"><i class="ti ti-edit" style="color:var(--azul)"></i> Editando morador</strong>
+      <div class="row2">
+        <div><label>Apartamento</label><input id="em-apto-${m.id}" inputmode="numeric" value="${escapeH(m.apartamento)}"></div>
+        <div><label>Bloco</label><input id="em-bloco-${m.id}" value="${escapeH(m.bloco||'')}"></div>
+      </div>
+      <label>Nome</label>
+      <input id="em-nome-${m.id}" value="${escapeH(m.nome)}">
+      <label>Telefone (WhatsApp)</label>
+      <input id="em-telefone-${m.id}" inputmode="tel" value="${escapeH(m.telefone||'')}">
+      <button class="acao" onclick="salvarEdicaoMorador('${m.id}')"><i class="ti ti-device-floppy"></i> Salvar alterações</button>
+      <button class="acao sec" onclick="cancelarEdicaoMorador()"><i class="ti ti-x"></i> Cancelar</button>
+    </div>`;
+    }
+    return `
     <div class="lista-item">
       <div class="li-topo">
         <div>
@@ -1698,7 +1747,9 @@ function renderMoradores(){
           <div class="meta">${m.telefone?'📱 '+escapeH(m.telefone):'⚠️ sem telefone'}</div>
         </div>
       </div>
-    </div>`).join('');
+      ${PAPEL==='gestao'?`<button class="acao sec" style="margin-top:12px" onclick="abrirEdicaoMorador('${m.id}')"><i class="ti ti-edit"></i> Editar morador</button>`:''}
+    </div>`;
+  }).join('');
 }
 
 // ---------- IMPORTAR PLANILHA ----------
