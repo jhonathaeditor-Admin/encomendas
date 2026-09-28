@@ -480,7 +480,12 @@ function toast(msg, cor){
 }
 function gerarCodigo(){
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sem O,0,I,1 pra não confundir
-  let c=""; for(let i=0;i<4;i++) c+=chars[Math.floor(Math.random()*chars.length)];
+  // evita repetir um código que já está em uso (pendentes + histórico recente)
+  const usados = new Set(ENCOMENDAS.map(e=>(e.codigo_retirada||'').toUpperCase()));
+  let c="", tentativas=0;
+  do{
+    c=""; for(let i=0;i<4;i++) c+=chars[Math.floor(Math.random()*chars.length)];
+  }while(usados.has(c) && ++tentativas<50);
   return c;
 }
 function fmtData(iso){
@@ -575,13 +580,38 @@ async function renderInicio(){
 }
 
 // ---------- carregar dados ----------
+// O Supabase devolve NO MÁXIMO 1000 linhas por consulta. Esta função busca
+// em páginas de 1000 até acabar, para nunca cortar dados em silêncio.
+// Uso: await buscarTodas(()=> db.from('tabela').select('*').order(...))
+async function buscarTodas(montarQuery){
+  const PAG = 1000;
+  let tudo = [];
+  for(let de = 0; ; de += PAG){
+    const {data, error} = await montarQuery().range(de, de + PAG - 1);
+    if(error) throw error;
+    tudo = tudo.concat(data || []);
+    if(!data || data.length < PAG) break;   // última página
+  }
+  return tudo;
+}
+
+// Quanto histórico de RETIRADAS o app mantém na memória (as pendentes vêm todas, sempre).
+// Histórico completo fica na aba Relatórios, que consulta o banco direto.
+const JANELA_HISTORICO_DIAS = 30;
+function inicioJanelaHistorico(){
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const menos30 = new Date(hoje.getTime() - JANELA_HISTORICO_DIAS*86400000);
+  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  return menos30 < inicioMes ? menos30 : inicioMes;   // sempre cobre o mês inteiro (card "recebidas no mês")
+}
+
 async function carregarMoradores(){
   // Carrega TODOS (inclusive arquivados) para que encomendas antigas
   // sempre consigam mostrar o apartamento/nome. A lista e o dropdown
   // mostram só os ativos.
-  const {data, error} = await db.from('moradores').select('*').order('apartamento');
-  if(error){ toast('Erro ao carregar moradores', '#d23c3c'); console.error(error); return; }
-  MORADORES = data || [];
+  try{
+    MORADORES = await buscarTodas(()=> db.from('moradores').select('*').order('apartamento').order('id'));
+  }catch(error){ toast('Erro ao carregar moradores', '#d23c3c'); console.error(error); return; }
   renderMoradores();
 }
 
@@ -653,9 +683,13 @@ function definirTransportadora(nome){
 }
 
 async function carregarEncomendas(){
-  const {data, error} = await db.from('encomendas').select('*').order('recebida_em',{ascending:false});
-  if(error){ toast('Erro ao carregar encomendas', '#d23c3c'); console.error(error); return; }
-  ENCOMENDAS = data || [];
+  // pendentes (qualquer data) + tudo que foi recebido ou retirado dentro da janela
+  const desde = inicioJanelaHistorico().toISOString();
+  try{
+    ENCOMENDAS = await buscarTodas(()=> db.from('encomendas').select('*')
+      .or(`status.neq.retirada,recebida_em.gte."${desde}",retirada_em.gte."${desde}"`)
+      .order('recebida_em',{ascending:false}).order('id'));
+  }catch(error){ toast('Erro ao carregar encomendas', '#d23c3c'); console.error(error); return; }
   renderEncomendas();
 }
 
@@ -1129,6 +1163,15 @@ function renderEncomendas(){
 
   if(itens.length===0){ box.innerHTML = '<div class="vazio">Nenhuma encomenda aqui.</div>'; return; }
 
+  // desenha no máximo LIMITE_LISTA cartões (lista muito grande deixa o PDA lento)
+  const LIMITE_LISTA = 150;
+  const totalItens = itens.length;
+  const avisoLimite = totalItens > LIMITE_LISTA
+    ? `<div class="meta" style="text-align:center;padding:10px 4px">Mostrando ${LIMITE_LISTA} de ${totalItens}. Use a busca acima para achar uma encomenda específica.</div>` : '';
+  const avisoHistorico = (filtroAtual==='retiradas' || filtroAtual==='todas')
+    ? `<div class="meta" style="text-align:center;padding:10px 4px">Retiradas: últimos ${JANELA_HISTORICO_DIAS} dias. Histórico completo na aba Relatórios.</div>` : '';
+  itens = itens.slice(0, LIMITE_LISTA);
+
   box.innerHTML = itens.map(e=>{
     const m = MORADORES.find(x=>x.id===e.morador_id) || {};
     const retirada = e.status==='retirada';
@@ -1166,7 +1209,7 @@ function renderEncomendas(){
         <button class="linkbtn" style="color:var(--vermelho)" onclick="excluirEncomenda('${e.id}')"><i class="ti ti-trash"></i> Excluir esta encomenda</button>
       </div>`:''}
     </div>`;
-  }).join('');
+  }).join('') + avisoLimite + avisoHistorico;
 }
 
 async function excluirEncomenda(id){
@@ -1495,9 +1538,9 @@ function fecharScanner(){
   pararCamera();
   document.getElementById('scanner').style.display = 'none';
 }
-function processarCodigoBaixa(qrData, blob){
+async function processarCodigoBaixa(qrData, blob){
   const cod = (qrData||'').replace(/^ENC:/i,'');
-  const e = encomendaPorCodigoExato(cod);
+  const e = await encomendaPorCodigo(cod);
   const st = document.getElementById('baixa-status');
   document.getElementById('aba-encomendas').scrollIntoView({behavior:'smooth'});
   if(!e){ toast('Código não encontrado nas encomendas', '#d23c3c'); if(st) st.innerHTML='<span class="meta" style="color:var(--vermelho)">QR lido, mas o código não bate com nenhuma encomenda.</span>'; return; }
@@ -1524,7 +1567,24 @@ function distancia(a,b){
 function encomendaPorCodigoExato(cod){
   const c = (cod||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(!c) return null;
-  return ENCOMENDAS.find(e=>(e.codigo_retirada||'').toUpperCase()===c) || null;
+  const igual = e=>(e.codigo_retirada||'').toUpperCase()===c;
+  // se o código já foi usado antes, a PENDENTE tem prioridade sobre uma retirada antiga
+  return ENCOMENDAS.find(e=>igual(e) && e.status!=='retirada') || ENCOMENDAS.find(igual) || null;
+}
+// igual à de cima, mas se não achar na memória consulta o banco (encomendas antigas)
+async function encomendaPorCodigo(cod){
+  const local = encomendaPorCodigoExato(cod);
+  if(local) return local;
+  const c = (cod||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(!c) return null;
+  try{
+    const {data, error} = await db.from('encomendas').select('*')
+      .eq('codigo_retirada', c).order('recebida_em',{ascending:false}).limit(1);
+    if(error) throw error;
+    const e = data && data[0];
+    if(e && !ENCOMENDAS.find(x=>x.id===e.id)) ENCOMENDAS.push(e);
+    return e || null;
+  }catch(err){ console.error(err); return null; }
 }
 
 // procura a encomenda no texto do OCR:
@@ -1558,7 +1618,7 @@ async function lerBaixaFoto(ev){
   // lê o QR Code (rápido e confiável) — cruza com TODAS as encomendas
   try{
     const qr = await lerQR(file);
-    if(qr){ e = encomendaPorCodigoExato(qr.replace(/^ENC:/i,'')); }
+    if(qr){ e = await encomendaPorCodigo(qr.replace(/^ENC:/i,'')); }
   }catch(err){ console.error(err); }
 
   if(e && e.status==='retirada'){
@@ -1924,9 +1984,20 @@ async function gerarRelatorio(){
   const dias = parseInt(document.getElementById('rel-periodo').value)||0;
   const box = document.getElementById('rel-resultado');
   box.innerHTML = '';
-  await comCarregando('Gerando relatório…', async ()=>{ await carregarEncomendas(); });
   const limite = dias>0 ? Date.now()-dias*86400000 : 0;
-  let linhas = ENCOMENDAS.map(e=>({e, m: MORADORES.find(x=>x.id===e.morador_id)||{}}));
+  let doBanco = [];
+  try{
+    await comCarregando('Gerando relatório…', async ()=>{
+      doBanco = await buscarTodas(()=>{
+        let q = db.from('encomendas').select('*');
+        if(status==='pendentes') q = q.neq('status','retirada');
+        if(status==='retiradas') q = q.eq('status','retirada');
+        if(limite) q = q.gte('recebida_em', new Date(limite).toISOString());
+        return q.order('recebida_em',{ascending:false}).order('id');
+      });
+    });
+  }catch(err){ console.error(err); toast('Erro ao gerar relatório: '+(err.message||err), '#d23c3c'); return; }
+  let linhas = doBanco.map(e=>({e, m: MORADORES.find(x=>x.id===e.morador_id)||{}}));
   linhas = linhas.filter(({e,m})=>{
     if(bloco && normalizar(m.bloco)!==normalizar(bloco)) return false;
     if(status==='pendentes' && e.status==='retirada') return false;
@@ -1948,7 +2019,8 @@ async function gerarRelatorio(){
       </div>
       <button class="acao sec" style="margin-top:12px" onclick="baixarRelatorioCSV()"><i class="ti ti-download"></i> Baixar planilha (CSV)</button>
     </div>
-    ${linhas.length ? linhas.map(({e,m})=>`
+    ${linhas.length>200?`<div class="meta" style="text-align:center;padding:6px 4px 12px">Mostrando 200 de ${linhas.length} na tela. O CSV traz todas.</div>`:''}
+    ${linhas.length ? linhas.slice(0,200).map(({e,m})=>`
       <div class="lista-item">
         <div style="font-weight:700">Apto ${escapeH(m.apartamento||'?')}${m.bloco?' Bl '+escapeH(m.bloco):''} — ${escapeH(m.nome||'(removido)')}</div>
         <div class="meta">Código ${escapeH(e.codigo_retirada)} · ${e.transportadora?escapeH(e.transportadora)+' · ':''}${escapeH(e.status)}</div>
